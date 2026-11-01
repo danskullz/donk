@@ -1,0 +1,99 @@
+/* Shared components, ported from design/base.css (direction C). Hand-written, no framework. Structure comes from
+   spacing and one accent, not frames. Screen layouts are in session.css and the like; the map has its own
+   scoped styles in RegionMap.svelte. The .s-* "still state" twins of the comps' states sheet are not carried over. */
+
+.app { height: 100dvh; display: grid; grid-template-columns: minmax(0, 1fr); min-height: 0; }
+.sub, .dim { color: var(--sub); }
+.nums { font-variant-numeric: tabular-nums; }
+.show-s { display: none; }
+
+/* top bar */
+.bar { display: flex; align-items: center; gap: var(--s4); height: var(--bar-h); padding: 0 var(--s4); border-bottom: 1px solid var(--rule); font-size: var(--fs-sm); color: var(--sub); white-space: nowrap; }
+.brand { flex: none; color: var(--main); font-weight: 600; font-size: var(--fs-lg); letter-spacing: -0.02em; }
+.brand::after { content: "_" / ""; color: var(--text); }
+.bar .grow { flex: 1; min-width: 0; }
+.crumb { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.crumb b { color: var(--text); font-weight: 500; }
+
+/* buttons: flat; the primary is the only filled one */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--s2); height: 36px; padding: 0 var(--s4); border-radius: var(--radius); background: var(--surface); color: var(--text); font-weight: 500; font-size: var(--fs-md); white-space: nowrap; }
+.btn.primary { background: var(--main); color: var(--main-ink); font-weight: 600; }
+.btn kbd { color: inherit; opacity: 0.7; }
+kbd { font: 500 var(--fs-xs) / 1 var(--font); color: var(--sub); }
+kbd::before { content: "[" / ""; }
+kbd::after { content: "]" / ""; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 1px 8px; border-radius: var(--radius); background: var(--surface); color: var(--sub); font-size: var(--fs-xs); }
+.chip.due { color: var(--main); }
+.chip.warn { color: var(--error); }
+.eyebrow { color: var(--sub); font-size: var(--fs-xs); }
+
+/* segmented progress: one tick per card */
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; height: 4px; }
+.seg i { background: var(--seg-off); }
+.seg i.d { background: var(--main); }
+.seg i.c { background: var(--text); }
+
+/* plate: media without a frame; a surface behind it when it is not full-bleed */
+.plate { position: relative; min-width: 0; min-height: 0; background: var(--surface); }
+.cap { font-size: var(--fs-xs); color: var(--sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* tabs */
+.tabs { display: flex; gap: var(--s5); }
+.tab { height: 32px; min-width: 40px; padding: 0 var(--s1); color: var(--sub); font-weight: 500; border-bottom: 2px solid transparent; }
+.tab[aria-selected="true"] { color: var(--main); border-bottom-color: var(--main); }
+
+/* bottom action bar */
+.foot { display: flex; align-items: center; gap: var(--s4); height: var(--foot-h); padding: 0 var(--s4); border-top: 1px solid var(--rule); font-size: var(--fs-sm); color: var(--sub); }
+.foot .grow { flex: 1; min-width: 0; }
+
+/* interaction states: real :hover/:active/:focus-visible. Colour shifts only, no movement. */
+.btn, .opt, .tab, .sug, .zbtn, .view { transition: background-color var(--t-fast) ease, color var(--t-fast) ease; }
+.btn:hover { background: var(--surface-hi); }
+.btn.primary:hover { background: var(--main-hi); }
+.btn:active { background: var(--surface-lo); }
+.btn.primary:active { background: var(--main-lo); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.tab:hover { color: var(--text); }
+.tab[aria-selected="true"]:hover { color: var(--main); }
+
+/* answer options (multiple choice): a vertical list so long names never wrap badly */
+.opts { display: grid; gap: var(--s2); align-content: start; min-height: 0; }
+.opt { position: relative; display: flex; align-items: center; gap: var(--s3); width: 100%; min-height: 52px; padding: 6px var(--s4); background: var(--surface); text-align: left; font-size: var(--fs-lg); font-weight: 500; line-height: 1.25; }
+.opt kbd { flex: none; }
+.opt .lab { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.opt:hover { background: var(--surface-hi); }
+.opt:hover kbd { color: var(--text); }
+.opt:active { background: var(--surface-lo); box-shadow: inset 0 0 0 1px var(--rule-strong); }
+.opt:disabled { opacity: 0.4; cursor: not-allowed; }
+/* the first-letter hint rules options out without removing them */
+.opt.ruled { opacity: 0.4; }
+
+/* typed answer */
+.field { position: relative; display: flex; align-items: center; gap: var(--s2); height: 48px; padding: 0 var(--s4); background: var(--surface); border-bottom: 2px solid var(--rule-strong); font-size: var(--fs-lg); font-weight: 500; }
+.field .pre { color: var(--main); }
+.field input { flex: 1; min-width: 0; height: 100%; padding: 0; border: 0; outline: 0; background: none; color: var(--text); font: inherit; text-transform: inherit; caret-color: var(--main); }
+.field input::placeholder { color: var(--sub); font-weight: 400; }
+.field:focus-within { border-bottom-color: var(--main); }
+.sugg { position: absolute; z-index: 5; left: 0; right: 0; top: 100%; background: var(--surface-hi); }
+.sug { display: flex; align-items: center; gap: var(--s2); width: 100%; height: 38px; padding: 0 var(--s4); font-size: var(--fs-md); font-weight: 500; color: var(--text); text-align: left; }
+.sug::before { content: "> " / ""; color: transparent; }
+.sug b { color: var(--main); font-weight: 600; }
+.sug.hl { background: var(--surface-lo); }
+.sug.hl::before { color: var(--main); }
+.sug:hover { background: var(--surface-lo); }
+.sug .t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sug .z { margin-left: auto; padding-left: var(--s2); color: var(--sub); font-size: var(--fs-xs); font-weight: 400; white-space: nowrap; }
+
+/* map zoom controls */
+.zoom { position: absolute; z-index: 2; right: var(--s3); top: var(--s3); display: grid; gap: 2px; }
+.zbtn { display: grid; place-items: center; width: 36px; height: 36px; background: var(--bg); color: var(--text); font-weight: 600; font-size: var(--fs-lg); }
+.zbtn:hover { background: var(--surface-hi); }
+.zbtn:active { background: var(--surface-lo); }
+.zbtn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+@media (forced-colors: active) {
+  .tab[aria-selected="true"], .sug.hl { outline: 2px solid Highlight; outline-offset: -2px; }
+  .btn.primary, .opt, .field, .zbtn, .view { border: 1px solid ButtonText; }
+  .seg i.d { background: Highlight; }
+  .seg i.c { background: CanvasText; }
+}

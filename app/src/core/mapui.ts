@@ -1,0 +1,225 @@
+// The geometry and layout decisions behind the map component and the map screens (SCOPE.md §5.3, §5.4), kept out of
+// Svelte so they are tested without a browser: pinch zoom, the tap-to-zoom assist, arrow-key movement between
+// regions, label collisions, how a callout list is cut into pages, and how many cards of the map picker fit a window.
+
+import type { Point } from './geometry';
+import { centreOn, MAX_ZOOM, panBy, zoomAt, zoomLevel, type ViewBox } from './mapview';
+
+// ---------------------------------------------------------------------------------------------- screen <-> map
+
+export interface Rect {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+/** Screen pixels per radar pixel. The picture is letterboxed, so the smaller of the two ratios applies. */
+export function pixelsPerUnit(view: ViewBox, rect: Pick<Rect, 'width' | 'height'>): number {
+  return rect.width > 0 && rect.height > 0 ? Math.min(rect.width / view.w, rect.height / view.h) : 0;
+}
+
+/** The radar pixel under a screen point, for an svg of size `rect` showing `view` (xMidYMid meet). */
+export function clientToView(view: ViewBox, rect: Rect, x: number, y: number): Point {
+  const s = pixelsPerUnit(view, rect);
+  if (s === 0) return [view.x, view.y];
+  const ox = (rect.width - view.w * s) / 2;
+  const oy = (rect.height - view.h * s) / 2;
+  return [view.x + (x - rect.left - ox) / s, view.y + (y - rect.top - oy) / s];
+}
+
+/** Region outlines are drawn from path data (`M x y L x y … Z`); this reads the corners back for hit tests. */
+export function parsePath(d: string): Point[] {
+  const nums = d.match(/-?\d+(?:\.\d+)?/g)?.map(Number) ?? [];
+  const out: Point[] = [];
+  for (let i = 0; i + 1 < nums.length; i += 2) out.push([nums[i] as number, nums[i + 1] as number]);
+  return out;
+}
+
+// ---------------------------------------------------------------------------------------------------- pinch zoom
+
+/**
+ * The view for two fingers that started at `a0`, `b0` (screen points) on `start` and are now at `a1`, `b1`: spreading
+ * zooms about the point between the fingers, and moving both pans, so the map stays under the fingers.
+ */
+export function pinchView(start: ViewBox, fit: ViewBox, rect: Rect, a0: Point, b0: Point, a1: Point, b1: Point): ViewBox {
+  const d0 = Math.hypot(b0[0] - a0[0], b0[1] - a0[1]);
+  const d1 = Math.hypot(b1[0] - a1[0], b1[1] - a1[1]);
+  const mid0: Point = [(a0[0] + b0[0]) / 2, (a0[1] + b0[1]) / 2];
+  const mid1: Point = [(a1[0] + b1[0]) / 2, (a1[1] + b1[1]) / 2];
+  const anchor = clientToView(start, rect, mid0[0], mid0[1]);
+  const zoomed = d0 < 4 ? start : zoomAt(start, fit, anchor, d1 / d0);
+  const under = clientToView(zoomed, rect, mid1[0], mid1[1]);
+  return panBy(zoomed, fit, anchor[0] - under[0], anchor[1] - under[1]);
+}
+
+// ----------------------------------------------------------------------------------------------- tap-to-zoom assist
+
+export const TAP_TARGET_PX = 44;
+
+interface Bounds {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+}
+
+/** Shortest side of a region as it is on screen now, in pixels. */
+export function screenSide(view: ViewBox, rect: Pick<Rect, 'width' | 'height'>, b: Bounds): number {
+  return Math.min(b.maxX - b.minX, b.maxY - b.minY) * pixelsPerUnit(view, rect);
+}
+
+/**
+ * Regions under 44 px on screen are hard to hit with a finger (SCOPE §5.4), so the first tap on one zooms in on it
+ * instead. Null when the region is big enough, or the map cannot zoom further (then the tap counts).
+ */
+export function assistView(view: ViewBox, fit: ViewBox, rect: Pick<Rect, 'width' | 'height'>, b: Bounds, target = 72): ViewBox | null {
+  const side = screenSide(view, rect, b);
+  if (side >= TAP_TARGET_PX || side <= 0) return null;
+  const centre: Point = [(b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2];
+  const zoomed = centreOn(zoomAt(view, fit, centre, target / side), fit, centre);
+  return zoomLevel(zoomed, fit) > zoomLevel(view, fit) * 1.05 ? zoomed : null;
+}
+
+/**
+ * The view that shows a region the learner chose elsewhere (a row in the list): left alone when the region is already
+ * well inside the frame, otherwise centred on it, and zoomed in when the region would be too small to see.
+ */
+export function revealView(view: ViewBox, fit: ViewBox, rect: Pick<Rect, 'width' | 'height'>, b: Bounds, minSide = 28): ViewBox {
+  const centre: Point = [(b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2];
+  let v = view;
+  const side = screenSide(v, rect, b);
+  if (side > 0 && side < minSide) v = zoomAt(v, fit, centre, Math.min(MAX_ZOOM, (minSide * 2) / side));
+  const insideX = b.minX >= v.x + v.w * 0.1 && b.maxX <= v.x + v.w * 0.9;
+  const insideY = b.minY >= v.y + v.h * 0.1 && b.maxY <= v.y + v.h * 0.9;
+  return insideX && insideY ? v : centreOn(v, fit, centre);
+}
+
+// ------------------------------------------------------------------------------------------------- arrow-key moves
+
+export type Direction = 'left' | 'right' | 'up' | 'down';
+
+export interface Anchored {
+  id: string;
+  anchor: Point;
+}
+
+/**
+ * Where the arrow key goes: the nearest region in that direction, judged by its anchor. Regions inside a 45 degree
+ * cone of the direction come first; sideways drift costs double, so the move follows the line the learner pressed
+ * along. With nothing in the cone any region on that side will do. Null at the edge of the map.
+ */
+export function neighbourInDirection(items: readonly Anchored[], fromId: string, dir: Direction): string | null {
+  const from = items.find((i) => i.id === fromId);
+  if (!from) return null;
+  let best: { id: string; score: number } | null = null;
+  let bestOutside: { id: string; score: number } | null = null;
+  for (const it of items) {
+    if (it.id === fromId) continue;
+    const dx = it.anchor[0] - from.anchor[0];
+    const dy = it.anchor[1] - from.anchor[1];
+    const along = dir === 'right' ? dx : dir === 'left' ? -dx : dir === 'down' ? dy : -dy;
+    const across = Math.abs(dir === 'left' || dir === 'right' ? dy : dx);
+    if (along <= 0) continue;
+    const score = along + 2 * across;
+    const slot = across <= along ? 'in' : 'out';
+    const current = slot === 'in' ? best : bestOutside;
+    if (!current || score < current.score || (score === current.score && it.id < current.id)) {
+      if (slot === 'in') best = { id: it.id, score };
+      else bestOutside = { id: it.id, score };
+    }
+  }
+  return (best ?? bestOutside)?.id ?? null;
+}
+
+// ----------------------------------------------------------------------------------------------- label collisions
+
+export interface LabelBox {
+  id: string;
+  /** Centre of the text, in radar pixels. */
+  x: number;
+  y: number;
+  /** Size of the text, in radar pixels. */
+  w: number;
+  h: number;
+  /** Higher wins a collision. */
+  priority: number;
+}
+
+/** Labels to draw: greedy by priority, a label that would cover an earlier one is left out (the learner can zoom). */
+export function placeLabels(boxes: readonly LabelBox[], gap = 0): Set<string> {
+  const placed: LabelBox[] = [];
+  const order = boxes.slice().sort((a, b) => b.priority - a.priority || (a.id < b.id ? -1 : 1));
+  for (const b of order) {
+    const hit = placed.some((p) => Math.abs(p.x - b.x) < (p.w + b.w) / 2 + gap && Math.abs(p.y - b.y) < (p.h + b.h) / 2 + gap);
+    if (!hit) placed.push(b);
+  }
+  return new Set(placed.map((p) => p.id));
+}
+
+// ---------------------------------------------------------------------------------------------------- paged lists
+
+/**
+ * Cut rows into pages of at most `size`. Rows with the same `group` (a callout and its Hard spots) stay together on
+ * one page unless the group alone is longer than a page.
+ */
+export function pageRows<T extends { group: string }>(rows: readonly T[], size: number): T[][] {
+  const n = Math.max(1, Math.floor(size));
+  const groups: T[][] = [];
+  for (const row of rows) {
+    const last = groups[groups.length - 1];
+    if (last && last[0]?.group === row.group) last.push(row);
+    else groups.push([row]);
+  }
+  const pages: T[][] = [];
+  let page: T[] = [];
+  for (const g of groups) {
+    if (page.length > 0 && page.length + g.length > n) {
+      pages.push(page);
+      page = [];
+    }
+    if (g.length > n) {
+      if (page.length > 0) {
+        pages.push(page);
+        page = [];
+      }
+      for (let i = 0; i < g.length; i += n) {
+        const chunk = g.slice(i, i + n);
+        if (chunk.length === n) pages.push(chunk);
+        else page = chunk;
+      }
+    } else {
+      page.push(...g);
+    }
+  }
+  if (page.length > 0) pages.push(page);
+  return pages;
+}
+
+// ----------------------------------------------------------------------------------------------- the picker's grid
+
+export interface GridChoice {
+  cols: number;
+  rows: number;
+  /** Size of one card, in pixels. */
+  w: number;
+  h: number;
+}
+
+/**
+ * The columns and rows that give `count` cards the most room inside a `width` x `height` box, with no card smaller
+ * than `minW` x `minH`. The score is the biggest card of the wanted shape (`aspect` = width / height) that fits a
+ * cell, so a very wide or very tall card is not preferred over a sensible one. Null when nothing is big enough.
+ */
+export function bestGrid(count: number, width: number, height: number, gap: number, minW: number, minH: number, aspect: number): GridChoice | null {
+  let best: (GridChoice & { score: number }) | null = null;
+  for (let cols = 1; cols <= Math.max(1, count); cols++) {
+    const rows = Math.ceil(count / cols);
+    const w = (width - (cols - 1) * gap) / cols;
+    const h = (height - (rows - 1) * gap) / rows;
+    if (w < minW || h < minH) continue;
+    const score = Math.min(w, h * aspect);
+    if (!best || score > best.score + 0.5 || (Math.abs(score - best.score) <= 0.5 && cols < best.cols)) best = { cols, rows, w, h, score };
+  }
+  return best ? { cols: best.cols, rows: best.rows, w: best.w, h: best.h } : null;
+}

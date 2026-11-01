@@ -1,0 +1,68 @@
+/* Callouts design tokens. Direction A, "survey sheet", dark only. See MOODBOARD.md. */
+:root {
+  color-scheme: dark;
+
+  /* surfaces and rules */
+  --bg: #17181a;
+  --surface: #1e2023;
+  --surface-2: #26282c;
+  --rule: #34373c;          /* decorative dividers */
+  --rule-strong: #70747a;   /* control borders, 3:1 against bg */
+
+  /* text */
+  --text: #e8e6e1;
+  --text-2: #a9a69f;
+  --text-3: #96938c;
+
+  /* the one accent, and the answer colours */
+  --signal: #c8e04a;
+  --signal-ink: #17181a;
+  --wrong: #f0644a;
+
+  /* sides: only ever used to mean a side */
+  --ct: #5aa0e6;
+  --t: #e0a93b;
+
+  /* mastery ramp, plus the pattern colours for the two lowest states */
+  --m-new: #26282c;
+  --m-seen: #2d3033;
+  --m-seen-line: #4a4f55;
+  --m-learning: #444d2a;
+  --m-learning-dot: #7d8c3c;
+  --m-familiar: #62762c;
+  --m-known: #86a232;
+  --m-auto: #c8e04a;
+  --wall: #4a4e54;
+
+  /* type */
+  --font-cond: "Barlow Condensed", Bahnschrift, "Segoe UI", sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", "Cascadia Mono", Consolas, monospace;
+  --fs-xs: 11px;
+  --fs-sm: 12px;
+  --fs-md: 14px;
+  --fs-lg: 18px;
+  --fs-xl: 28px;
+  --fs-hero: clamp(34px, 6vh, 54px);
+
+  /* space (4 px base) and shape */
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 20px;
+  --s6: 28px;
+  --radius: 2px;
+  --bar-h: 48px;
+  --foot-h: 56px;
+}
+
+@media (max-width: 820px) {
+  :root {
+    --bar-h: 40px;
+    --foot-h: 52px;
+    --s4: 12px;
+    --s5: 12px;
+    --fs-hero: 38px;
+  }
+}

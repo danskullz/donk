@@ -1,0 +1,38 @@
+{
+  "name": "callouts",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "svelte-check --tsconfig ./tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "e2e": "playwright test",
+    "e2e:editor": "playwright test -c playwright.editor.config.ts",
+    "test:scripts": "vitest run --config vitest.scripts.config.ts",
+    "content:art": "node scripts/make-art.mjs",
+    "content:process": "node scripts/process-shots.mjs",
+    "content:validate": "node scripts/validate-content.mjs",
+    "content:all": "node scripts/make-art.mjs && node scripts/validate-content.mjs"
+  },
+  "dependencies": {
+    "@fontsource/ibm-plex-mono": "^5.3.0",
+    "idb": "^8.0.4",
+    "ts-fsrs": "^6.0.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.1",
+    "@sveltejs/vite-plugin-svelte": "^7.3.1",
+    "@types/node": "^26.6.6",
+    "sharp": "^0.35.5",
+    "svelte": "^5.57.3",
+    "svelte-check": "^4.7.7",
+    "typescript": "^6.0.3",
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5"
+  }
+}

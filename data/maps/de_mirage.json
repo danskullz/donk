@@ -1,0 +1,18 @@
+{
+  "id": "de_mirage",
+  "displayName": "Mirage",
+  "pool": "active-duty",
+  "projection": { "posX": -3230, "posY": 1713, "scale": 5 },
+  "radarSize": 1024,
+  "levels": [{ "id": "default" }],
+  "gameBuild": "26144732",
+  "revision": 1,
+  "zones": [
+    { "id": "t-spawn", "name": "T Spawn" },
+    { "id": "mid", "name": "Mid" },
+    { "id": "a-site", "name": "A Site" },
+    { "id": "b-site", "name": "B Site" },
+    { "id": "ct-spawn", "name": "CT Spawn" }
+  ],
+  "status": "draft"
+}

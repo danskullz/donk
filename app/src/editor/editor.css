@@ -1,0 +1,84 @@
+/* The Callout Editor (SCOPE.md §8.3). A dev-only tool for Dan, on desktop, so it may scroll (§5.3 exempts it) and
+   uses the same tokens as the app: dark, one monospace face, flat surfaces, one accent. Global and namespaced `ed-`
+   because its panels share a lot of small parts. Not part of the production bundle. */
+
+.ed { height: 100dvh; display: grid; grid-template-columns: minmax(0, 1fr) 400px; grid-template-rows: auto minmax(0, 1fr); background: var(--bg); }
+.ed-bar { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s4); padding: var(--s2) var(--s4); border-bottom: 1px solid var(--rule); font-size: var(--fs-sm); color: var(--sub); }
+.ed-bar .brand { margin-right: var(--s2); }
+.ed-bar .sep { width: 1px; align-self: stretch; background: var(--rule); }
+.ed-group { display: flex; align-items: center; gap: var(--s2); }
+.ed-group label { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.ed-group input[type="range"] { width: 90px; accent-color: var(--main); }
+.ed-tool { height: 30px; min-width: 34px; padding: 0 var(--s3); background: var(--surface); color: var(--text); font-size: var(--fs-sm); font-weight: 500; white-space: nowrap; }
+.ed-tool:hover { background: var(--surface-hi); }
+.ed-tool[aria-pressed="true"] { background: var(--main); color: var(--main-ink); font-weight: 600; }
+.ed-tool kbd { opacity: 0.7; margin-left: 4px; color: inherit; }
+.ed-status { margin-left: auto; display: flex; align-items: center; gap: var(--s3); }
+.ed-status .ok { color: var(--main); }
+.ed-status .bad { color: var(--error); }
+
+.ed-stage { position: relative; min-width: 0; min-height: 0; background: var(--surface-lo); overflow: hidden; }
+.ed-stage > .ed-notice { position: absolute; left: var(--s3); bottom: var(--s3); right: var(--s3); display: grid; gap: 4px; padding: var(--s2) var(--s3); background: var(--bg); color: var(--sub); font-size: var(--fs-xs); border-left: 2px solid var(--main); }
+.ed-hint { position: absolute; left: var(--s3); top: var(--s3); padding: 3px var(--s2); background: var(--bg); color: var(--sub); font-size: var(--fs-xs); pointer-events: none; }
+
+.ed-side { display: grid; grid-template-rows: auto minmax(0, 1fr); min-height: 0; border-left: 1px solid var(--rule); }
+.ed-tabs { display: flex; gap: var(--s4); padding: 0 var(--s4); border-bottom: 1px solid var(--rule); }
+.ed-tabs .tab { position: relative; }
+.ed-tabs .count { margin-left: 4px; color: var(--sub); font-size: var(--fs-xs); }
+.ed-tabs .count.bad { color: var(--error); }
+.ed-panel { overflow: auto; min-height: 0; padding: var(--s4); display: grid; align-content: start; gap: var(--s4); }
+.ed-panel h2 { font-size: var(--fs-sm); font-weight: 500; color: var(--sub); border-bottom: 1px solid var(--rule); padding-bottom: var(--s1); }
+.ed-empty { color: var(--sub); }
+
+/* form parts */
+.ed-form { display: grid; gap: var(--s3); }
+.ed-row { display: grid; gap: 4px; }
+.ed-row > label, .ed-row > .lab { color: var(--sub); font-size: var(--fs-xs); }
+.ed-row .two { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s2); }
+.ed-row .three { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--s2); }
+.ed input[type="text"], .ed input[type="number"], .ed input[type="search"], .ed select, .ed textarea { width: 100%; min-width: 0; padding: 6px var(--s2); background: var(--surface); border: 0; border-bottom: 2px solid var(--rule-strong); border-radius: 0; color: var(--text); font: inherit; font-size: var(--fs-md); text-transform: none; }
+.ed textarea { resize: vertical; min-height: 64px; line-height: 1.4; }
+.ed input:focus, .ed select:focus, .ed textarea:focus { outline: none; border-bottom-color: var(--main); }
+.ed select { appearance: auto; }
+.ed .count { color: var(--sub); font-size: var(--fs-xs); text-align: right; }
+.ed .count.bad { color: var(--error); }
+.ed .btn { height: 30px; padding: 0 var(--s3); font-size: var(--fs-sm); }
+.ed .btn.danger { color: var(--error); }
+.ed-actions { display: flex; flex-wrap: wrap; gap: var(--s2); }
+.ed-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.ed-chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; background: var(--surface); color: var(--text); font-size: var(--fs-xs); }
+.ed-chip button { color: var(--sub); }
+.ed-chip button:hover { color: var(--error); }
+.ed-chip.add { color: var(--main); }
+.ed-chip.add:hover { background: var(--surface-hi); }
+.ed-note { color: var(--sub); font-size: var(--fs-xs); line-height: 1.45; }
+.ed-note.warn { color: var(--error); }
+
+/* callout list */
+.ed-list { display: grid; }
+.ed-zone { display: flex; justify-content: space-between; padding: var(--s2) 0 var(--s1); margin-top: var(--s2); color: var(--sub); font-size: var(--fs-xs); border-bottom: 1px solid var(--rule); }
+.ed-item { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto auto; align-items: center; gap: var(--s2); width: 100%; min-height: 32px; padding: 0 var(--s2); border-bottom: 1px solid var(--rule); text-align: left; }
+.ed-item:hover { background: var(--surface-lo); }
+.ed-item[aria-current="true"] { background: var(--surface); box-shadow: inset 2px 0 0 var(--main); }
+.ed-item .dot { width: 8px; height: 8px; background: var(--rule-strong); }
+.ed-item .dot.done { background: var(--main); }
+.ed-item .dot.bad { background: var(--error); }
+.ed-item .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.ed-item .tier, .ed-item .n { color: var(--sub); font-size: var(--fs-xs); }
+.ed-new { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--s2); }
+
+/* shots and issues */
+.ed-shot { display: grid; gap: var(--s2); padding: var(--s3); background: var(--surface); }
+.ed-shot header { display: flex; justify-content: space-between; align-items: center; gap: var(--s2); }
+.ed-issue { display: grid; gap: 2px; padding: var(--s2) 0; border-bottom: 1px solid var(--rule); text-align: left; width: 100%; }
+.ed-issue .rule { font-size: var(--fs-xs); color: var(--sub); }
+.ed-issue.error .rule { color: var(--error); }
+.ed-issue:hover { background: var(--surface-lo); }
+.ed-zonerow { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; gap: var(--s2); align-items: center; }
+
+/* the map picker */
+.ed-home { padding: var(--s6); display: grid; align-content: start; gap: var(--s4); max-width: 720px; }
+.ed-home h1 { font-size: var(--fs-xl); font-weight: 600; letter-spacing: -0.03em; }
+.ed-home ul { list-style: none; margin: 0; padding: 0; display: grid; }
+.ed-home li { display: flex; justify-content: space-between; gap: var(--s4); padding: var(--s3) 0; border-bottom: 1px solid var(--rule); }
+.ed-home a { color: var(--main); }

@@ -1,0 +1,80 @@
+TEXT (needs 4.5:1; 3:1 for text 18 px and up)
+  text      on bg          10.9  ok
+  text      on surface      9.8  ok
+  text      on surface-hi   8.6  ok
+  text      on surface-lo  10.4  ok
+  sub       on bg           6.2  ok
+  sub       on surface      5.6  ok
+  sub       on surface-hi   4.9  ok
+  sub       on surface-lo   5.9  ok
+  main      on bg          11.4  ok
+  main      on surface     10.3  ok
+  main      on ok-bg        9.3  ok
+  main-ink  on main        11.4  ok
+  main-ink  on main-hi     13.0  ok
+  main-ink  on main-lo      8.0  ok
+  error     on bg           5.3  ok
+  error     on surface      4.8  ok
+  error     on no-bg        4.8  ok
+NON-TEXT (needs 3:1)
+  rule-strong  on bg           3.5  ok  (control outlines, swatch outlines)
+  rule-strong  on surface      3.2  ok  (control outlines on a card)
+  main         on bg          11.4  ok  (focus ring, selected marker)
+  main         on surface-hi   9.0  ok  (focus ring on a hovered control)
+  error        on bg           5.3  ok  (wrong-answer icon)
+  text         on m-new        8.9  ok  (hover outline on an unstarted region)
+  main         on bg          11.4  ok  (selected-region ring: it carries a dark band on both sides, so it is judged against bg, not against the region fill)
+MASTERY RAMP against the page background (information also carried by hatch/dots and by text in the list)
+  new                  1.2
+  seen (hatch line)    2.4
+  learning (dot)       4.6
+  familiar             3.2
+  known                5.7
+  automatic           11.4
+
+TARGETS at 360x640 (24 px is the WCAG 2.2 AA floor; 44 px is our own rule, SCOPE.md 5.4)
+  page        count  min h  min w   smaller than 44 px in height (class: size, count)
+  home           12     44    164   none
+  ask             6     44     55   none
+  typeq           8     44     55   none
+  pin             2     44     55   none
+  pin-reveal      1     44     86   none
+  session         1     44     86   none
+      text sizes (px: characters): 11: 54, 12: 77, 13: 8, 16: 14, 32: 9
+  map            12     40     44   tab: 44x40 x5; row: 336x42 x4; btn: 336x40 x1; btn: 164x40 x2
+      text sizes (px: characters): 11: 47, 12: 28, 13: 70, 16: 8
+  map-hard       15     40     44   tab: 44x40 x5; row: 336x42 x4; btn: 336x40 x1; btn: 164x40 x2
+
+TARGETS at 1280x720 (24 px is the WCAG 2.2 AA floor; 44 px is our own rule, SCOPE.md 5.4)
+  page        count  min h  min w   smaller than 44 px in height (class: size, count)
+  home           12     36    133   btn: 133x36 x1; btn: 188x36 x1
+  ask             6     36     91   btn: 91x36 x2
+  typeq           8     36     91   sug: 352x38 x5; btn: 91x36 x2
+  pin             2     36     91   btn: 91x36 x2
+  pin-reveal      1     36     94   btn: 94x36 x1
+  session         1     36     94   btn: 94x36 x1
+  map            12     32     40   tab: 40x32 x5; btn: 245x36 x2
+  map-hard       15     32     36   zbtn: 36x36 x3; tab: 40x32 x5; btn: 245x36 x2
+
+STRUCTURE (static checks over the generated pages)
+  css has prefers-reduced-motion   yes
+  css has forced-colors            yes
+  css has :focus-visible           yes
+  css has .sr-only                 yes
+  home               ok
+  session            ok
+  map                ok
+  ask                ok
+  typeq              ok
+  pin                ok
+  pin-reveal         ok
+  map-hard           ok
+  session-stress     ok
+  map-stress         ok
+  ask-stress         ok
+  typeq-stress       ok
+  pin-reveal-stress  ok
+  map-hard-stress    ok
+  states             ok
+
+contrast failures: 0, structure issues: 0

@@ -1,0 +1,12 @@
+[
+  { "id": "de_ancient", "displayName": "Ancient", "pool": "active-duty", "available": false },
+  { "id": "de_anubis", "displayName": "Anubis", "pool": "active-duty", "available": false },
+  { "id": "de_cache", "displayName": "Cache", "pool": "active-duty", "available": false },
+  { "id": "de_dust2", "displayName": "Dust II", "pool": "active-duty", "available": false },
+  { "id": "de_inferno", "displayName": "Inferno", "pool": "active-duty", "available": false },
+  { "id": "de_mirage", "displayName": "Mirage", "pool": "active-duty", "available": true },
+  { "id": "de_nuke", "displayName": "Nuke", "pool": "active-duty", "available": false },
+  { "id": "de_overpass", "displayName": "Overpass", "pool": "extra", "available": false },
+  { "id": "de_train", "displayName": "Train", "pool": "extra", "available": false },
+  { "id": "de_vertigo", "displayName": "Vertigo", "pool": "extra", "available": false }
+]

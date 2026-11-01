@@ -1,0 +1,72 @@
+/* Callouts design tokens. Direction C, "terminal", dark only. See MOODBOARD.md.
+   Six core colours (bg, surface, sub, text, main, error), one monospace face. */
+:root {
+  color-scheme: dark;
+
+  /* the six */
+  --bg: #1c1d1f;
+  --surface: #242629;
+  --sub: #9a9da1;           /* secondary text, 6.2:1 on bg, 4.9:1 on the hover surface */
+  --text: #d1d0c5;
+  --main: #c8e04a;          /* the one accent: primary action, correct, mastery */
+  --error: #e0705f;         /* wrong answers, always with an icon or strike-through */
+
+  /* supporting values */
+  --main-ink: #1c1d1f;
+  --rule: #2e3033;          /* decorative dividers */
+  --rule-strong: #6f7378;   /* control and swatch outlines, 3:1 */
+  --seg-off: #3a3d41;
+
+  /* interaction states: colour shifts only, no movement */
+  --surface-hi: #2d3033;    /* hover on a flat surface */
+  --surface-lo: #1f2123;    /* pressed */
+  --main-hi: #d6ee5c;       /* primary hover */
+  --main-lo: #a8bd36;       /* primary pressed */
+  --ok-bg: #2a3017;         /* correct answer row */
+  --no-bg: #35221f;         /* wrong answer row */
+  --t-fast: 90ms;           /* state changes */
+  --t-reveal: 400ms;        /* guess-to-truth line, the one longer motion */
+  --wall: #4a4e54;
+  --ct: #5aa0e6;            /* sides only */
+  --t: #e0a93b;
+
+  /* mastery ramp, plus the pattern colours for the two lowest states */
+  --m-new: #2b2d30;
+  --m-seen: #323538;
+  --m-seen-line: #555a60;
+  --m-learning: #434b2c;
+  --m-learning-dot: #7d8c3c;
+  --m-familiar: #5f7230;
+  --m-known: #84a032;
+  --m-auto: #c8e04a;
+
+  /* type: one face for everything */
+  --font: "IBM Plex Mono", "Cascadia Mono", Consolas, monospace;
+  --fs-xs: 11px;
+  --fs-sm: 12px;
+  --fs-md: 13px;
+  --fs-lg: 16px;
+  --fs-xl: 26px;
+  --fs-hero: clamp(30px, 5.6vh, 46px);
+
+  /* space (4 px base) and shape */
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 20px;
+  --s6: 28px;
+  --radius: 2px;
+  --bar-h: 44px;
+  --foot-h: 52px;
+}
+
+@media (max-width: 820px) and (max-aspect-ratio: 4/3) {
+  :root {
+    --bar-h: 40px;
+    --foot-h: 52px;
+    --s4: 12px;
+    --s5: 12px;
+    --fs-hero: 32px;
+  }
+}

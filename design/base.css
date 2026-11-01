@@ -1,0 +1,152 @@
+/* Components, direction C. Hand-written, no framework. Every shell is a grid with fr rows and cannot scroll.
+   Structure comes from spacing and one accent, not frames. Class names such as .cond are kept from the generator. */
+*, *::before, *::after { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text); }
+body { overflow: hidden; font: 400 var(--fs-md) / 1.5 var(--font); -webkit-font-smoothing: antialiased; text-transform: lowercase; }
+img { display: block; }
+h1, h2, h3, p { margin: 0; font: inherit; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; text-transform: inherit; }
+:focus-visible { outline: 2px solid var(--main); outline-offset: 2px; }
+
+.app { height: 100dvh; display: grid; min-height: 0; }
+.cond, .mono { font-family: var(--font); }
+.sub, .dim { color: var(--sub); }
+.nums { font-variant-numeric: tabular-nums; }
+.show-s { display: none; }
+
+/* top bar */
+.bar { display: flex; align-items: center; gap: var(--s4); height: var(--bar-h); padding: 0 var(--s4); border-bottom: 1px solid var(--rule); font-size: var(--fs-sm); color: var(--sub); white-space: nowrap; }
+.brand { flex: none; color: var(--main); font-weight: 600; font-size: var(--fs-lg); letter-spacing: -0.02em; }
+.brand::after { content: "_" / ""; color: var(--text); }
+.bar .grow { flex: 1; min-width: 0; }
+.crumb { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.crumb b { color: var(--text); font-weight: 500; }
+
+/* buttons: flat; the primary is the only filled one */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--s2); height: 36px; padding: 0 var(--s4); border-radius: var(--radius); background: var(--surface); color: var(--text); font-weight: 500; font-size: var(--fs-md); white-space: nowrap; }
+.btn.primary { background: var(--main); color: var(--main-ink); font-weight: 600; }
+.btn kbd { color: inherit; opacity: 0.7; }
+kbd { font: 500 var(--fs-xs) / 1 var(--font); color: var(--sub); }
+kbd::before { content: "[" / ""; }
+kbd::after { content: "]" / ""; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 1px 8px; border-radius: var(--radius); background: var(--surface); color: var(--sub); font-size: var(--fs-xs); }
+.chip.due { color: var(--main); }
+.eyebrow { color: var(--sub); font-size: var(--fs-xs); }
+
+/* segmented progress: one tick per card or callout */
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; height: 4px; }
+.seg i { background: var(--seg-off); }
+.seg i.d { background: var(--main); }
+.seg i.c { background: var(--text); }
+
+/* plate: media without a frame; a surface behind it when it is not full-bleed */
+.plate { position: relative; min-width: 0; min-height: 0; background: var(--surface); }
+.cap { font-size: var(--fs-xs); color: var(--sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* tabs */
+.tabs { display: flex; gap: var(--s5); }
+.tab { height: 32px; min-width: 40px; padding: 0 var(--s1); color: var(--sub); font-weight: 500; border-bottom: 2px solid transparent; }
+.tab[aria-selected="true"] { color: var(--main); border-bottom-color: var(--main); }
+
+/* mastery glyph and map classes (patterns are defined once per page) */
+.mg { width: 14px; height: 14px; flex: none; border: 1px solid var(--rule-strong); }
+.r-new { fill: var(--m-new); }
+.r-seen { fill: url(#p-seen); }
+.r-learning { fill: url(#p-learning); }
+.r-familiar { fill: var(--m-familiar); }
+.r-known { fill: var(--m-known); }
+.r-auto { fill: var(--m-auto); }
+.m-wall { fill: var(--wall); stroke: var(--wall); stroke-width: 3; stroke-linejoin: round; }
+.m-bound { fill: none; stroke: var(--surface); stroke-width: 1.6; }
+.m-sil { fill: var(--m-new); stroke: var(--wall); stroke-width: 3; stroke-linejoin: round; }
+.lbl { font: 600 13px var(--font); text-transform: lowercase; fill: var(--text); stroke: var(--bg); stroke-width: 3.4px; paint-order: stroke; stroke-linejoin: round; text-anchor: middle; pointer-events: none; }
+.lbl.sel { fill: var(--main); font-size: 15px; }
+.cone { fill: var(--main); fill-opacity: 0.5; }
+.you { fill: var(--main); stroke: var(--bg); stroke-width: 2.5; }
+.legend { display: flex; flex-wrap: wrap; gap: var(--s2) var(--s4); font-size: var(--fs-xs); color: var(--sub); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+
+/* bottom action bar */
+.foot { display: flex; align-items: center; gap: var(--s4); height: var(--foot-h); padding: 0 var(--s4); border-top: 1px solid var(--rule); font-size: var(--fs-sm); color: var(--sub); }
+.foot .grow { flex: 1; min-width: 0; }
+
+/* ---- interaction states. Real :hover/:active/:focus-visible plus .s-* twins so the states sheet can show them still. ---- */
+.btn, .opt, .tab, .row, .sug, .zbtn { transition: background-color var(--t-fast) ease, color var(--t-fast) ease; }
+.btn:hover, .btn.s-hover { background: var(--surface-hi); }
+.btn.primary:hover, .btn.primary.s-hover { background: var(--main-hi); }
+.btn:active, .btn.s-active { background: var(--surface-lo); }
+.btn.primary:active, .btn.primary.s-active { background: var(--main-lo); }
+.btn:disabled, .btn.s-disabled { opacity: 0.4; cursor: not-allowed; }
+.tab:hover, .tab.s-hover { color: var(--text); }
+.tab[aria-selected="true"]:hover { color: var(--main); }
+.row:hover, .row.s-hover { background: var(--surface-lo); }
+.row[aria-current="true"]:hover { background: var(--surface); }
+.s-focus { outline: 2px solid var(--main); outline-offset: 2px; }
+
+/* answer options (multiple choice): a vertical list so long names never wrap badly */
+.opts { display: grid; gap: var(--s2); align-content: start; min-height: 0; }
+.opt { position: relative; display: flex; align-items: center; gap: var(--s3); width: 100%; min-height: 52px; padding: 6px var(--s4); background: var(--surface); text-align: left; font-size: var(--fs-lg); font-weight: 500; line-height: 1.25; }
+.opt kbd { flex: none; }
+.opt .lab { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.opt .mk { flex: none; width: 14px; height: 14px; display: none; }
+.opt .mk svg { display: block; width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.4; }
+.opt:hover, .opt.s-hover { background: var(--surface-hi); }
+.opt:hover kbd, .opt.s-hover kbd { color: var(--text); }
+.opt:active, .opt.s-active { background: var(--surface-lo); box-shadow: inset 0 0 0 1px var(--rule-strong); }
+.opt:disabled, .opt.s-disabled { opacity: 0.4; cursor: not-allowed; }
+.opt.ok { background: var(--ok-bg); color: var(--main); box-shadow: inset 3px 0 0 var(--main); }
+.opt.ok .mk, .opt.no .mk { display: block; }
+.opt.no { background: var(--no-bg); color: var(--error); box-shadow: inset 3px 0 0 var(--error); }
+.opt.no .lab { text-decoration: line-through; text-decoration-thickness: 2px; }
+
+/* typed answer */
+.field { position: relative; display: flex; align-items: center; gap: var(--s2); height: 48px; padding: 0 var(--s4); background: var(--surface); border-bottom: 2px solid var(--rule-strong); font-size: var(--fs-lg); font-weight: 500; }
+.field .pre { color: var(--main); }
+.field .ph { color: var(--sub); font-weight: 400; }
+.field .caret { width: 0.6em; height: 1.15em; margin-left: -4px; background: var(--main); animation: blink 1.1s steps(1) infinite; }
+.field:focus-within, .field.is-focus { border-bottom-color: var(--main); }
+.field.err { border-bottom-color: var(--error); }
+@keyframes blink { 50% { opacity: 0; } }
+.sugg { position: absolute; z-index: 5; left: 0; right: 0; top: 100%; background: var(--surface-hi); }
+.sug { display: flex; align-items: center; gap: var(--s2); height: 38px; padding: 0 var(--s4); font-size: var(--fs-md); font-weight: 500; color: var(--text); }
+.sug::before { content: "> " / ""; color: transparent; }
+.sug b { color: var(--main); font-weight: 600; }
+.sug.hl { background: var(--surface-lo); }
+.sug.hl::before { color: var(--main); }
+.sug:hover { background: var(--surface-lo); }
+.sug .t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sug .z { margin-left: auto; padding-left: var(--s2); color: var(--sub); font-size: var(--fs-xs); font-weight: 400; white-space: nowrap; }
+
+/* switch */
+.switch.on i { border-color: var(--main); }
+.switch.on i::after { left: 15px; background: var(--main); }
+
+/* map zoom controls and the minimap that shows where a zoomed view sits */
+.zoom { position: absolute; z-index: 2; right: var(--s3); top: var(--s3); display: grid; gap: 2px; }
+.zbtn { display: grid; place-items: center; width: 36px; height: 36px; background: var(--bg); color: var(--text); font-weight: 600; font-size: var(--fs-lg); }
+.zbtn:hover, .zbtn.s-hover { background: var(--surface-hi); }
+.zbtn:active, .zbtn.s-active { background: var(--surface-lo); }
+.minimap { position: absolute; z-index: 2; left: var(--s3); top: var(--s3); width: 118px; padding: 4px; background: var(--bg); }
+.minimap svg { display: block; width: 100%; height: auto; }
+.minimap .vp { fill: none; stroke: var(--main); stroke-width: 14; }
+
+/* map regions, interaction states (hover and focus use outlines, never fill, so mastery colour stays readable) */
+.rg:hover > path, .rg.s-hover > path { stroke: var(--text); stroke-width: 2; }
+.rg:focus-visible { outline: none; }
+.rg:focus-visible > path, .rg.s-focus > path { stroke: var(--main); stroke-width: 2.6; stroke-dasharray: 5 3; }
+.rg.dim { opacity: 0.45; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: 0ms !important; animation-duration: 0ms !important; animation-iteration-count: 1 !important; }
+  .field .caret { animation: none; }
+}
+
+/* ---- accessibility helpers ---- */
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+@media (forced-colors: active) {
+  .opt.ok, .opt.no, .row[aria-current="true"], .tab[aria-selected="true"], .card.active, .sug.hl { outline: 2px solid Highlight; outline-offset: -2px; }
+  .btn.primary, .opt, .field, .zbtn { border: 1px solid ButtonText; }
+  .seg i.d { background: Highlight; }
+  .seg i.c { background: CanvasText; }
+  .m-bound, .m-wall { stroke: CanvasText; }
+}

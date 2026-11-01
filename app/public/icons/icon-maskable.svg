@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <title>callouts_</title>
+  <rect width="512" height="512" fill="#1c1d1f"/>
+  <g transform="translate(256 256) scale(0.82) translate(-268 -256)">
+    <path d="M306.7 171.7A110 110 0 1 0 306.7 340.3" fill="none" stroke="#c8e04a" stroke-width="60"/>
+    <rect x="330" y="356" width="110" height="40" fill="#d1d0c5"/>
+  </g>
+</svg>

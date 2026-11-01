@@ -1,0 +1,168 @@
+/* Screens added after the first three comps: the question (name it, multiple choice and typed), pin it,
+   the Hard-mode map, and the states sheet. Same grid rules as screens.css: fr rows, nothing scrolls. */
+
+/* ---------------- question: name it (multiple choice) and typed ---------------- */
+.ask, .typeq { grid-template-rows: var(--bar-h) minmax(0, 1fr) var(--foot-h); }
+.ask .bar .seg, .typeq .bar .seg { width: 260px; }
+.a-body { display: grid; grid-template-columns: minmax(0, 2.4fr) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); gap: var(--s6); padding: var(--s5) var(--s6); min-height: 0; }
+.a-left { display: flex; flex-direction: column; gap: var(--s2); min-height: 0; min-width: 0; }
+.a-right { display: grid; grid-template-rows: auto auto minmax(0, 1fr); gap: var(--s4); align-content: start; min-height: 0; min-width: 0; }
+.prompt { display: grid; gap: 2px; }
+.prompt .big { font-size: var(--fs-xl); font-weight: 600; letter-spacing: -0.03em; line-height: 1.15; }
+.a-right, .p-right, .s-right { grid-template-columns: minmax(0, 1fr); }
+.keys { display: grid; gap: var(--s2); color: var(--sub); font-size: var(--fs-sm); align-content: start; }
+.keys span { display: flex; gap: var(--s2); }
+.a-field { position: relative; align-self: start; }
+
+/* ---------------- pin it ---------------- */
+.pin { grid-template-rows: var(--bar-h) minmax(0, 1fr) var(--foot-h); }
+.pin .bar .seg { width: 260px; }
+.p-body { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); gap: var(--s6); padding: var(--s5) var(--s6); min-height: 0; }
+.p-map { position: relative; display: grid; grid-template-rows: minmax(0, 1fr) auto; gap: var(--s2); padding: var(--s3); min-height: 0; min-width: 0; }
+.p-map .stage { min-height: 0; min-width: 0; }
+.p-map .stage > svg { display: block; width: 100%; height: 100%; cursor: crosshair; }
+.p-right { display: grid; grid-template-rows: auto auto minmax(0, 1fr); gap: var(--s4); align-content: start; min-height: 0; min-width: 0; }
+.p-right .verdict .answer { color: var(--text); }
+.pin.reveal .p-right .verdict .answer { color: var(--main); }
+.off { display: inline-flex; gap: var(--s2); align-items: center; }
+.guessline { fill: none; stroke: var(--text); stroke-width: 3; stroke-dasharray: 9 6; stroke-dashoffset: 0; animation: draw var(--t-reveal) ease-out both; }
+.guessline.solid { stroke-dasharray: none; }
+.guessx { fill: none; stroke: var(--error); stroke-width: 5; stroke-linecap: square; }
+.truthdot { fill: var(--main); stroke: var(--bg); stroke-width: 3; }
+.truthfill { fill: var(--main); fill-opacity: 0.55; animation: fadein var(--t-reveal) ease-out both; }
+@keyframes draw { from { stroke-dashoffset: 400; opacity: 0; } to { stroke-dashoffset: 0; opacity: 1; } }
+@keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
+
+/* ---------------- Hard-mode map ---------------- */
+.mapscreen.hard .mp-plate .stage { position: relative; }
+.mp-plate { position: relative; }
+.zoomed { --k: var(--kd, 2.4); }
+.mp-plate .stage > svg.only-m { display: none; }
+.zoomed .lbl { font-size: calc(13px / var(--k)); stroke-width: calc(3.4px / var(--k)); }
+.zoomed .lbl.sel { font-size: calc(15px / var(--k)); }
+.zoomed .lbl.hard { font-size: calc(11px / var(--k)); font-weight: 500; }
+.zoomed .m-wall { stroke-width: calc(3px / var(--k)); }
+.zoomed .m-bound { stroke-width: calc(1.6px / var(--k)); }
+.hs .ol { fill: none; stroke: var(--text); stroke-width: calc(1.4px / var(--k, 1)); }
+.lbl.hard { font-size: 11px; font-weight: 500; }
+.hs.new .ol { stroke-dasharray: calc(5px / var(--k, 1)) calc(3px / var(--k, 1)); }
+.sw-hard { width: 14px; height: 14px; flex: none; border: 1px dashed var(--text); }
+
+/* ---------------- states sheet ---------------- */
+.sheet { grid-template-rows: var(--bar-h) minmax(0, 1fr); }
+.sh-body { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); gap: var(--s6); padding: var(--s5) var(--s6); min-height: 0; }
+.sh-col { display: grid; align-content: start; gap: var(--s3); min-width: 0; min-height: 0; }
+.sh-col h2 { font-size: var(--fs-sm); font-weight: 500; color: var(--sub); border-bottom: 1px solid var(--rule); padding-bottom: var(--s2); }
+.sh-row { display: grid; grid-template-columns: 74px minmax(0, 1fr); gap: var(--s3); align-items: center; }
+.sh-row > .tag { color: var(--sub); font-size: var(--fs-xs); }
+.sh-row .btn { height: 32px; width: 100%; padding: 0 var(--s2); }
+.sh-row .opt { min-height: 38px; font-size: var(--fs-md); padding: 4px var(--s3); }
+.sh-row .field { height: 38px; font-size: var(--fs-md); }
+.sh-row .row .st { display: none; }
+.sh-map { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--s2); }
+.sh-map svg { display: block; width: 100%; height: auto; background: var(--surface); }
+.sh-map .tag { color: var(--sub); font-size: var(--fs-xs); text-align: center; margin-top: 4px; }
+.sh-note { color: var(--sub); font-size: var(--fs-xs); line-height: 1.45; }
+.sh-note b { color: var(--text); font-weight: 500; }
+.sh-motion { display: grid; gap: 6px; font-size: var(--fs-xs); color: var(--sub); }
+.sh-motion div { display: grid; grid-template-columns: 70px 1fr; gap: var(--s2); }
+.sh-motion b { color: var(--text); font-weight: 500; }
+
+/* ---------------- small screens ---------------- */
+@media (max-width: 820px) and (max-aspect-ratio: 4/3) {
+  .a-body { grid-template-columns: 1fr; grid-template-rows: auto auto auto minmax(0, 1fr); gap: var(--s2); padding: var(--s3); align-content: start; }
+  .a-left, .a-right { display: contents; }
+  .a-body .shot { grid-column: 1; order: 1; max-height: none; }
+  .a-body .cap { order: 2; }
+  .prompt { order: 3; }
+  .prompt .eyebrow { display: none; }
+  .prompt .big { font-size: var(--fs-lg); }
+  .opts { order: 4; }
+  .opt { min-height: 46px; font-size: var(--fs-md); padding: 4px var(--s3); }
+  .keys { display: none; }
+  .a-field { order: 4; }
+  .sugg { top: 100%; }
+  .typeq .shot { max-height: none; }
+
+  .p-body { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr) auto; gap: var(--s2); padding: var(--s3); }
+  .p-right { display: contents; }
+  .p-right .prompt, .p-right .verdict { order: 1; }
+  .p-map { order: 2; padding: var(--s2); }
+  .p-right .about { order: 3; }
+  .p-right .about .blurb, .p-right .about .chips { display: none; }
+  .p-right .verdict .miss { font-size: var(--fs-md); }
+  .pin .keys { display: none; }
+
+  .ask .bar .seg, .typeq .bar .seg, .pin .bar .seg { width: auto; flex: 1; }
+  .foot .btn { height: 44px; padding: 0 var(--s3); }
+  .sug { height: 44px; }
+  .today .acts .btn { height: 44px; }
+  .zoomed { --k: var(--km, 1.2); }
+  .mp-plate .stage > svg.only-d { display: none; }
+  .mp-plate .stage > svg.only-m { display: block; }
+  .minimap { display: none; }
+  .mapscreen.hard .pager { display: flex; padding-top: 2px; }
+  .zoom { grid-auto-flow: column; }
+  .p-right .off { order: 1; }
+  .pin .verdict .eyebrow { display: none; }
+  .minimap { width: 76px; left: var(--s2); top: var(--s2); padding: 3px; }
+  .zoom { right: var(--s2); top: var(--s2); }
+  .zbtn { width: 44px; height: 44px; }
+
+  .sh-body { grid-template-columns: 1fr 1fr; }
+}
+
+/* the soft keyboard is open (a phone in portrait with about 340 px left): the suggestions open upward over the
+   screenshot, and the footer and caption give way. Used with <meta name="viewport" content="interactive-widget=resizes-content">. */
+@media (max-width: 820px) and (max-aspect-ratio: 4/3) and (max-height: 460px) {
+  .typeq { grid-template-rows: var(--bar-h) minmax(0, 1fr); }
+  .typeq .foot, .typeq .cap, .typeq .prompt { display: none; }
+  .typeq .a-body { grid-template-rows: minmax(0, 1fr) auto; }
+  .typeq .shot { max-height: 100%; }
+  .typeq .sugg { top: auto; bottom: 100%; }
+  .typeq .sug:nth-child(n+4) { display: none; }
+}
+
+/* ---------------- short landscape (a phone on its side, 640 x 360 up to about 900 x 520): the desktop layout, compressed ---------------- */
+@media (max-height: 520px) and (min-aspect-ratio: 4/3) {
+  :root { --bar-h: 34px; --foot-h: 42px; --s4: 12px; --s5: 10px; --s6: 14px; --fs-hero: 24px; --fs-xl: 20px; }
+  .a-body, .s-body, .p-body, .mp-body { padding: var(--s3) var(--s4); gap: var(--s4); }
+  .a-right, .p-right, .s-right { gap: var(--s2); }
+  .prompt .big { font-size: 18px; }
+  .opts { gap: 4px; }
+  .opt { min-height: 34px; padding: 3px var(--s3); font-size: var(--fs-md); }
+  .keys, .confuse, .about .chips, .s-right > .chips, .peek, .pin .keys { display: none; }
+  .btn { height: 30px; }
+  .foot .btn { height: 30px; }
+  .field { height: 38px; }
+  .sug { height: 30px; }
+  .verdict .miss { font-size: var(--fs-md); }
+  .map-plate { padding: var(--s1); }
+  .today { padding: var(--s2) var(--s4); }
+  .today .big { font-size: 18px; }
+  .picker { gap: var(--s2); padding: var(--s1) var(--s4) var(--s3); }
+  .card .inset { width: 40px; height: 40px; margin: var(--s1); }
+  .card .info { padding: var(--s2); gap: 3px; }
+  .card h3, .card .pct { font-size: var(--fs-md); }
+  .hints { display: none; }
+  .home { grid-template-rows: var(--bar-h) auto minmax(0, 1fr); }
+  .title h1 { font-size: 26px; }
+  .title .stats { display: none; }
+  .mp-side { gap: var(--s2); }
+  .row { height: 28px; }
+  .row .nm { font-size: var(--fs-md); }
+  .acts2 { gap: 4px; }
+  .acts2 .btn, .acts2 .primary { height: 30px; padding: 0 var(--s2); }
+  .btn kbd { display: none; }
+  .legend { font-size: 10px; gap: 2px var(--s3); }
+  .zbtn { width: 30px; height: 30px; }
+  .minimap { width: 76px; }
+  .bar .seg, .ask .bar .seg, .typeq .bar .seg, .pin .bar .seg, .session .bar .seg { width: auto; flex: 1; min-width: 48px; }
+  .bar .grow { flex: 0; }
+  .verdict .eyebrow, .off .sub { display: none; }
+}
+
+/* grids whose single column must not grow past the container when a child is nowrap */
+.mp-side, .listwrap, .list, .sh-col { grid-template-columns: minmax(0, 1fr); }
+.sh-row .tabs { gap: var(--s2); }
+.sh-row .tab { min-width: 24px; padding: 0 2px; }
