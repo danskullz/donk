@@ -62,6 +62,8 @@
     follow?: boolean;
     /** A still thumbnail (the Home picker): thin lines, no controls. */
     compact?: boolean;
+    /** The open zone on the Map screen: regions outside this set are dimmed and left unlabelled. */
+    focus?: ReadonlySet<string> | null;
   }
 
   let {
@@ -90,6 +92,7 @@
     assist = true,
     follow = false,
     compact = false,
+    focus = null,
   }: Props = $props();
 
   // Several maps can share a page (the Home picker); every pattern id has to be unique to this one.
@@ -324,7 +327,7 @@
     const boxes: LabelBox[] = [];
     for (const s of shown) {
       const isSel = s.id === selected;
-      if (!isSel && !wide) continue;
+      if (!isSel && (!wide || (focus && !focus.has(s.id)))) continue;
       if (!isSel && s.tier === 3 && screenSide(view, rect, s.bounds) < 22) continue;
       const fs = isSel ? SELECTED_LABEL_PX : s.tier === 3 ? HARD_LABEL_PX : LABEL_PX;
       boxes.push({ id: s.id, x: s.anchor[0], y: s.anchor[1], w: (s.name.length * 0.6 * fs + 6) * px, h: fs * 1.3 * px, priority: (isSel ? 1000 : 0) + (4 - s.tier) * 10 + Math.log10(s.area + 1) });
@@ -375,11 +378,13 @@
           bind:this={els[s.id]}
           class="rg"
           class:lit={lit?.has(s.id)}
+          class:dim={focus && !focus.has(s.id)}
           class:hs={s.tier === 3}
           class:fresh={s.tier === 3 && (!fills || fills[s.id] === 'new')}
           style:fill={fillOf(s.id)}
           d={s.d}
           data-id={s.id}
+          data-mastery={fills?.[s.id]}
           role={focusable ? 'button' : undefined}
           tabindex={focusable ? (s.id === stopId ? 0 : -1) : undefined}
           aria-label={focusable ? nameOf(s) : undefined}
@@ -508,6 +513,11 @@
   }
   .rg.hs.fresh {
     stroke-dasharray: calc(5px * var(--px)) calc(3px * var(--px));
+  }
+  /* Outside the open zone: darker, not fainter. Fading would let the wall colour show through, and a New region (the
+     darkest fill) would then look brighter than the zone that is in focus. */
+  .rg.dim {
+    filter: brightness(0.55);
   }
   .rg.lit {
     fill: var(--m-familiar);

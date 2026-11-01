@@ -4,9 +4,13 @@ import {
   assistView,
   bestGrid,
   clientToView,
+  fitWithArt,
+  listRows,
   neighbourInDirection,
+  pageOf,
   pageRows,
   parsePath,
+  pathBounds,
   pinchView,
   pixelsPerUnit,
   placeLabels,
@@ -271,5 +275,72 @@ describe('the picker grid', () => {
 
   it('copes with a single card', () => {
     expect(bestGrid(1, 400, 300, 8, 100, 100, 1.15)).toMatchObject({ cols: 1, rows: 1, w: 400, h: 300 });
+  });
+});
+
+// ----------------------------------------------------------------------------------- map art, and the rows of a zone
+
+describe('the box around map art', () => {
+  it('reads absolute commands', () => {
+    expect(pathBounds('M10 20L30 5L40 60Z')).toEqual({ minX: 10, minY: 5, maxX: 40, maxY: 60 });
+  });
+
+  it('follows relative commands and several loops', () => {
+    // m moves from the origin, l moves from there; the second loop starts from the first loop's end
+    expect(pathBounds('m10 10l20 0l0 20zM-5 -5L0 0Z')).toEqual({ minX: -5, minY: -5, maxX: 30, maxY: 30 });
+  });
+
+  it('reads numbers that run into each other with signs and decimals', () => {
+    expect(pathBounds('M1.5-2.5L3.25 4')).toEqual({ minX: 1.5, minY: -2.5, maxX: 3.25, maxY: 4 });
+  });
+
+  it('is null for an empty path', () => {
+    expect(pathBounds('')).toBeNull();
+    expect(pathBounds('Z')).toBeNull();
+  });
+
+  it('widens the fit view to take in art that runs past it, and leaves it when the art is inside', () => {
+    const box: ViewBox = { x: 100, y: 100, w: 800, h: 600 };
+    expect(fitWithArt(box, null)).toBe(box);
+    expect(fitWithArt(box, { minX: 200, minY: 200, maxX: 300, maxY: 300 })).toEqual(box);
+    const wide = fitWithArt(box, { minX: 0, minY: 150, maxX: 950, maxY: 650 }, 0);
+    expect(wide).toEqual({ x: 0, y: 100, w: 950, h: 600 });
+  });
+});
+
+
+describe('the rows of a zone', () => {
+  const c = (id: string, zone: string, tier: 1 | 2 | 3, order: number | undefined, parent: string | null = null) => ({ id: `t.${id}`, name: id, zone, tier, order, parent: parent ? `t.${parent}` : null });
+  const all = [
+    c('b', 'a', 2, 2),
+    c('a', 'a', 1, 0),
+    c('spot2', 'a', 3, 3, 'a'),
+    c('spot1', 'a', 3, 1, 'a'),
+    c('other', 'x', 1, 0),
+    c('late', 'a', 2, undefined),
+    c('strayspot', 'a', 3, 0, 'other'),
+  ];
+
+  it('lists the zone in route order, each callout followed by its Hard spots', () => {
+    expect(listRows(all, 'a').map((r) => r.id)).toEqual(['t.a', 't.spot1', 't.spot2', 't.b', 't.late', 't.strayspot']);
+  });
+
+  it('keeps a callout and its Hard spots in one group, and marks the spots nested', () => {
+    const rows = listRows(all, 'a');
+    expect(rows.filter((r) => r.group === 't.a').map((r) => [r.id, r.nested])).toEqual([['t.a', false], ['t.spot1', true], ['t.spot2', true]]);
+  });
+
+  it('lists a Hard spot whose callout is in another zone as a row of its own at the end', () => {
+    const last = listRows(all, 'a').at(-1);
+    expect(last).toEqual({ id: 't.strayspot', group: 't.strayspot', nested: false });
+  });
+
+  it('is empty for a zone without callouts, and finds the page of a row', () => {
+    expect(listRows(all, 'nope')).toEqual([]);
+    const pages = pageRows(listRows(all, 'a'), 3);
+    expect(pageOf(pages, 't.b')).toBe(1);
+    expect(pageOf(pages, 't.a')).toBe(0);
+    expect(pageOf(pages, 't.other')).toBe(0);
+    expect(pageOf(pages, null)).toBe(0);
   });
 });
