@@ -36,19 +36,24 @@ a.card:focus-visible { outline: 2px solid var(--main); outline-offset: -2px; }
 .card .low .stat { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .card .low .chip { flex: none; }
 .card .short { display: none; }
+/* the marker as words in the stats line: only the row layout uses it, where the corner tag would cover the percent */
+.card .mark { display: none; color: var(--main); }
 .card .fillbar { height: 4px; background: var(--seg-off); }
 .card .fillbar i { display: block; height: 100%; background: var(--main); }
 
 /* narrow cards say "Core 4/10" instead of "Core 4 of 10" */
 @container card (max-width: 210px) {
-  .long { display: none; }
-  .short { display: inline; }
+  .card .long { display: none; }
+  .card .short { display: inline; }
 }
 
 /* the row layout: the map small on the left, the numbers beside it */
 .card.row { grid-template-columns: 54px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); align-items: center; }
 .card.row .thumb { grid-area: 1 / 1; width: 46px; height: 46px; margin-left: var(--s2); padding: 3px; align-self: center; }
-.card.row .tag { left: auto; right: var(--s2); top: var(--s1); }
+.card.row .tag { display: none; }
+/* the "dev map" chip has no room beside the name and the percent on a narrow card: the bigger cards say it */
+.card.row .top .chip { display: none; }
+.card.row .mark { display: inline; }
 .card.row .info { grid-area: 1 / 2; padding: var(--s2); gap: 4px; }
 .card.row h3 { font-size: 14px; }
 .card.row .pct { font-size: 13px; }
@@ -71,10 +76,13 @@ a.card:focus-visible { outline: 2px solid var(--main); outline-offset: -2px; }
 
 /* short landscape (a phone on its side): the desktop layout, compressed */
 @media (max-height: 520px) and (min-aspect-ratio: 4/3) {
+  /* session.css squeezes every bar's spacer to nothing at this size (its own bars hold a progress strip); not this one */
+  .home .bar .grow { flex: 1; }
   .today { padding: var(--s2) var(--s4); }
   .today .big { font-size: 18px; }
   .picker { gap: var(--s2); padding: var(--s1) var(--s4) var(--s3); }
   .card .info { padding: var(--s2); gap: 3px; }
+  .card.row .info { padding: 5px var(--s2); gap: 3px; }
   .card h3, .card .pct { font-size: var(--fs-md); }
   .hints { display: none; }
   .home { grid-template-rows: var(--bar-h) auto minmax(0, 1fr); }

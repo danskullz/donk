@@ -4,6 +4,7 @@
 
 import type { Point } from './geometry';
 import { centreOn, MAX_ZOOM, panBy, zoomAt, zoomLevel, type ViewBox } from './mapview';
+import type { Callout } from './schema';
 
 // ---------------------------------------------------------------------------------------------- screen <-> map
 
@@ -36,6 +37,53 @@ export function parsePath(d: string): Point[] {
   return out;
 }
 
+/**
+ * The box around path data written with the commands `M m L l Z z` (what `pnpm content:art` writes, core/artfile.ts).
+ * Relative commands are followed, so the numbers are not simply read as points. Null for an empty path.
+ */
+export function pathBounds(d: string): Bounds | null {
+  const tokens = d.match(/[MmLlZz]|-?(?:\d+\.?\d*|\.\d+)/g) ?? [];
+  let relative = false;
+  let x = 0;
+  let y = 0;
+  let pending: number | null = null;
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const t of tokens) {
+    if (/^[A-Za-z]$/.test(t)) {
+      relative = t === 'm' || t === 'l';
+      pending = null;
+      continue;
+    }
+    const n = Number(t);
+    if (pending === null) {
+      pending = n;
+      continue;
+    }
+    x = relative ? x + pending : pending;
+    y = relative ? y + n : n;
+    pending = null;
+    minX = Math.min(minX, x);
+    maxX = Math.max(maxX, x);
+    minY = Math.min(minY, y);
+    maxY = Math.max(maxY, y);
+  }
+  return minX === Infinity ? null : { minX, minY, maxX, maxY };
+}
+
+/** The fit view widened to take in the map art too, which can run past the outermost callout. */
+export function fitWithArt(fit: ViewBox, art: Bounds | null, pad = 0.03): ViewBox {
+  if (!art) return fit;
+  const margin = Math.max(art.maxX - art.minX, art.maxY - art.minY) * pad;
+  const minX = Math.min(fit.x, art.minX - margin);
+  const minY = Math.min(fit.y, art.minY - margin);
+  const maxX = Math.max(fit.x + fit.w, art.maxX + margin);
+  const maxY = Math.max(fit.y + fit.h, art.maxY + margin);
+  return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+}
+
 // ---------------------------------------------------------------------------------------------------- pinch zoom
 
 /**
@@ -57,7 +105,7 @@ export function pinchView(start: ViewBox, fit: ViewBox, rect: Rect, a0: Point, b
 
 export const TAP_TARGET_PX = 44;
 
-interface Bounds {
+export interface Bounds {
   minX: number;
   minY: number;
   maxX: number;
@@ -94,6 +142,9 @@ export function revealView(view: ViewBox, fit: ViewBox, rect: Pick<Rect, 'width'
   const insideY = b.minY >= v.y + v.h * 0.1 && b.maxY <= v.y + v.h * 0.9;
   return insideX && insideY ? v : centreOn(v, fit, centre);
 }
+
+/** Display names of the six mastery states, lowest first (the legend, the list rows, the region labels). */
+export const MASTERY_LABEL = { new: 'New', seen: 'Seen', learning: 'Learning', familiar: 'Familiar', known: 'Known', automatic: 'Automatic' } as const;
 
 // ------------------------------------------------------------------------------------------------- arrow-key moves
 
@@ -195,6 +246,46 @@ export function pageRows<T extends { group: string }>(rows: readonly T[], size: 
   }
   if (page.length > 0) pages.push(page);
   return pages;
+}
+
+/** The page that holds a row, or 0 when it is on none (a callout from another zone). */
+export function pageOf<T extends { id: string }>(pages: readonly (readonly T[])[], id: string | null): number {
+  if (id === null) return 0;
+  const i = pages.findIndex((p) => p.some((r) => r.id === id));
+  return i < 0 ? 0 : i;
+}
+
+export interface ListRow {
+  id: string;
+  /** The row's callout, or the callout a Hard spot sits in: rows of one group are never split across pages. */
+  group: string;
+  /** A Hard spot shown under its callout. */
+  nested: boolean;
+}
+
+type Listed = Pick<Callout, 'id' | 'name' | 'zone' | 'tier' | 'parent' | 'order'>;
+
+const byRoute = (a: Listed, b: Listed): number => (a.order ?? 9999) - (b.order ?? 9999) || a.tier - b.tier || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0) || (a.id < b.id ? -1 : 1);
+
+/**
+ * The rows for one zone: callouts in route order (the order of the walk from spawn toward the site, SCOPE §4.3), each
+ * followed by its Hard spots. A Hard spot whose callout is in another zone (or missing) is listed as a row of its own
+ * at the end, where it still can be reached.
+ */
+export function listRows(callouts: readonly Listed[], zone: string): ListRow[] {
+  const inZone = callouts.filter((c) => c.zone === zone);
+  const ids = new Set(inZone.map((c) => c.id));
+  const standard = inZone.filter((c) => c.tier !== 3).sort(byRoute);
+  const spots = inZone.filter((c) => c.tier === 3);
+  const rows: ListRow[] = [];
+  for (const c of standard) {
+    rows.push({ id: c.id, group: c.id, nested: false });
+    for (const h of spots.filter((x) => x.parent === c.id).sort(byRoute)) rows.push({ id: h.id, group: c.id, nested: true });
+  }
+  for (const h of spots.filter((x) => x.parent === null || !ids.has(x.parent) || !standard.some((c) => c.id === x.parent)).sort(byRoute)) {
+    rows.push({ id: h.id, group: h.id, nested: false });
+  }
+  return rows;
 }
 
 // ----------------------------------------------------------------------------------------------- the picker's grid

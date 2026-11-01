@@ -225,6 +225,7 @@
             {/if}
             <div class="low">
               <span class="stat">
+                {#if tag}<span class="mark">{tag} · </span>{/if}
                 {#if s.core.total > 0}
                   <span class="long">Core {s.core.familiar} of {s.core.total}</span><span class="short">Core {s.core.familiar}/{s.core.total}</span>
                 {:else}
