@@ -6,6 +6,7 @@ import {
   EXPORT_FORMAT,
   EXPORT_VERSION,
   exportFileName,
+  importCounts,
   MIGRATIONS,
   mergeEvents,
   parseImport,
@@ -233,6 +234,49 @@ describe('merging', () => {
     const result = mergeEvents(big.slice(0, 10000), big);
     expect(result.added).toHaveLength(10000);
     expect(result.alreadyHere).toBe(10000);
+  });
+});
+
+describe('the numbers the import screen shows', () => {
+  const rows = (n: number, from = 0): ReviewEvent[] => Array.from({ length: n }, (_, i) => ({ ...intro('test.mid', T0 + from + i), id: `e${from + i}` }));
+
+  it('says "412 new, 30 already here, 0 invalid" for a file of 442 events of which 30 are in the log', () => {
+    const inLog = rows(30);
+    const file = serializeExport(buildExport([...inLog, ...rows(412, 30)], SETTINGS, T0));
+    const parsed = parseImport(file);
+    if (!parsed.ok) throw new Error(parsed.message);
+    expect(importCounts(parsed, mergeEvents(inLog, parsed.events))).toEqual({ added: 412, alreadyHere: 30, invalid: 0, conflicts: 0 });
+  });
+
+  it('puts every row of the file in exactly one of the first three counts', () => {
+    const inLog = rows(5); // e0 to e4 are already stored
+    // 12 distinct ids (e0 to e11), then e0 to e4 again and e0 once more inside the file, then three rows that are not events
+    const fileRows = [...rows(12), ...inLog, inLog[0], { kind: 'nope' }, 'text', { ...inLog[1], extra: true }];
+    const parsed = parseImport(JSON.stringify({ ...buildExport([], SETTINGS, T0), events: fileRows }));
+    if (!parsed.ok) throw new Error(parsed.message);
+    const counts = importCounts(parsed, mergeEvents(inLog, parsed.events));
+    // new: e5 to e11. already here: e0 to e4 in the log, plus the six repeats inside the file. invalid: the three odd rows.
+    expect(counts).toEqual({ added: 7, alreadyHere: 5 + 6, invalid: 3, conflicts: 0 });
+    expect(counts.added + counts.alreadyHere + counts.invalid).toBe(fileRows.length);
+  });
+
+  it('is zero everywhere for an empty file, and a second import of the same file adds nothing', () => {
+    const empty = parseImport(serializeExport(buildExport([], SETTINGS, T0)));
+    if (!empty.ok) throw new Error(empty.message);
+    expect(importCounts(empty, mergeEvents(rows(3), empty.events))).toEqual({ added: 0, alreadyHere: 0, invalid: 0, conflicts: 0 });
+
+    const parsed = parseImport(serializeExport(buildExport(rows(8), SETTINGS, T0)));
+    if (!parsed.ok) throw new Error(parsed.message);
+    const once = mergeEvents([], parsed.events);
+    expect(importCounts(parsed, mergeEvents(once.merged, parsed.events))).toEqual({ added: 0, alreadyHere: 8, invalid: 0, conflicts: 0 });
+  });
+
+  it('reports events that differ from the stored one, which stays', () => {
+    const stored = rows(3);
+    const changed = stored.map((e) => (e.kind === 'intro' ? { ...e, ts: e.ts + 1 } : e));
+    const parsed = parseImport(serializeExport(buildExport(changed, SETTINGS, T0)));
+    if (!parsed.ok) throw new Error(parsed.message);
+    expect(importCounts(parsed, mergeEvents(stored, parsed.events))).toEqual({ added: 0, alreadyHere: 3, invalid: 0, conflicts: 3 });
   });
 });
 

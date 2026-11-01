@@ -5,16 +5,16 @@
   const columns = [KEYMAP.slice(0, 1), KEYMAP.slice(1)];
 </script>
 
-<div class="st-panel">
+<div class="set-panel">
   {#each columns as column, i (i)}
-    <div class="st-col">
+    <div class="set-col">
       {#each column as group (group.id)}
-        <section class="st-block">
+        <section class="set-block">
           <h2>{group.title}</h2>
-          <ul class="st-keys">
+          <ul class="set-keys">
             {#each group.rows as row (row.does)}
               <li>
-                <span class="st-keys-keys">{#each row.keys as k (k)}<kbd>{k}</kbd>{' '}{/each}</span>
+                <span class="set-keys-keys">{#each row.keys as k (k)}<kbd>{k}</kbd>{' '}{/each}</span>
                 <span>{row.does}</span>
               </li>
             {/each}

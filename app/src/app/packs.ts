@@ -15,6 +15,8 @@ export const packCacheName = (mapId: string): string => `${PACK_PREFIX}${mapId}`
 
 /** A record kept inside the pack's own cache, so deleting the cache deletes the numbers with it. */
 const META_URL = 'pack-meta.json';
+/** The Cache API stores its address as an absolute one, a plain test cache as written. */
+const isMeta = (url: string): boolean => url === META_URL || url.endsWith(`/${META_URL}`);
 
 export interface PackTarget {
   mapId: string;
@@ -67,37 +69,47 @@ export interface CacheLike {
   put(request: string, response: Response): Promise<void>;
   match(request: string): Promise<Response | undefined>;
   keys(): Promise<readonly { url: string }[]>;
+  delete(request: string): Promise<boolean>;
 }
 
+/** What the pack's own cache remembers: when it was last saved and how big each picture is (by address). */
 interface Meta {
   version: 1;
   at: number;
-  bytes: number;
+  sizes: Record<string, number>;
 }
 
 async function readMeta(cache: CacheLike): Promise<Meta | null> {
   try {
     const hit = await cache.match(META_URL);
     const raw: unknown = hit ? await hit.json() : null;
-    if (typeof raw === 'object' && raw !== null && typeof (raw as Meta).bytes === 'number' && typeof (raw as Meta).at === 'number') return raw as Meta;
+    if (typeof raw !== 'object' || raw === null) return null;
+    const { at, sizes } = raw as Partial<Meta>;
+    if (typeof at !== 'number' || typeof sizes !== 'object' || sizes === null) return null;
+    const clean: Record<string, number> = {};
+    for (const [url, size] of Object.entries(sizes)) if (typeof size === 'number' && size >= 0) clean[url] = size;
+    return { version: 1, at, sizes: clean };
   } catch {
     // unreadable record: the pictures still count, their size is just not known
+    return null;
   }
-  return null;
 }
+
+/** Bytes of the given pictures as recorded when they were saved. Only the ones in the pack count, so a picture dropped from the map stops counting. */
+const sizeOf = (meta: Meta | null, urls: readonly string[]): number => (meta ? urls.reduce((sum, u) => sum + (meta.sizes[u] ?? 0), 0) : 0);
 
 export async function readStatus(cache: CacheLike | null, urls: readonly string[], inline: number): Promise<PackStatus> {
   const total = urls.length;
   if (total === 0) return { state: inline > 0 ? 'inline' : 'empty', total: 0, cached: 0, bytes: 0, updatedAt: null, inline };
   if (!cache) return { state: 'none', total, cached: 0, bytes: 0, updatedAt: null, inline };
   const have = new Set((await cache.keys()).map((r) => r.url));
-  const cached = urls.filter((u) => have.has(u)).length;
-  const meta = cached > 0 ? await readMeta(cache) : null;
+  const here = urls.filter((u) => have.has(u));
+  const meta = here.length > 0 ? await readMeta(cache) : null;
   return {
-    state: cached === 0 ? 'none' : cached < total ? 'partial' : 'ready',
+    state: here.length === 0 ? 'none' : here.length < total ? 'partial' : 'ready',
     total,
-    cached,
-    bytes: meta?.bytes ?? 0,
+    cached: here.length,
+    bytes: sizeOf(meta, here),
     updatedAt: meta?.at ?? null,
     inline,
   };
@@ -127,11 +139,14 @@ export interface DownloadOptions {
 export async function downloadInto(cache: CacheLike, urls: readonly string[], options: DownloadOptions = {}): Promise<Progress> {
   const fetcher = options.fetcher ?? fetch;
   const now = options.now ?? Date.now;
-  const have = options.refresh ? new Set<string>() : new Set((await cache.keys()).map((r) => r.url));
+  const stored = new Set((await cache.keys()).map((r) => r.url));
+  const have = options.refresh ? new Set<string>() : stored;
   const previous = options.refresh ? null : await readMeta(cache);
   const skipped = urls.filter((u) => have.has(u));
   // Pictures kept from an earlier run count as done, with the size recorded for them.
-  const progress: Progress = { done: skipped.length, failed: 0, total: urls.length, bytes: skipped.length > 0 ? (previous?.bytes ?? 0) : 0 };
+  const sizes: Record<string, number> = {};
+  for (const u of skipped) if (previous?.sizes[u] !== undefined) sizes[u] = previous.sizes[u] ?? 0;
+  const progress: Progress = { done: skipped.length, failed: 0, total: urls.length, bytes: sizeOf(previous, skipped) };
   options.onProgress?.({ ...progress });
 
   const queue = urls.filter((u) => !have.has(u));
@@ -144,6 +159,7 @@ export async function downloadInto(cache: CacheLike, urls: readonly string[], op
         if (!response.ok || !type.startsWith('image/')) throw new Error(`not a picture (${response.status} ${type})`);
         const body = await response.blob();
         await cache.put(url, new Response(body, { headers: { 'content-type': type } }));
+        sizes[url] = body.size;
         progress.bytes += body.size;
         progress.done += 1;
       } catch {
@@ -155,8 +171,17 @@ export async function downloadInto(cache: CacheLike, urls: readonly string[], op
   }
   await Promise.all(Array.from({ length: Math.max(1, Math.min(options.concurrency ?? 4, queue.length)) }, worker));
 
-  if (progress.done > 0) {
-    const meta: Meta = { version: 1, at: now(), bytes: progress.bytes };
+  // A picture the map no longer has would sit in the pack forever and make its size a lie, so it goes. Not after a stop:
+  // the learner interrupted a download, nothing else has changed.
+  const wanted = new Set(urls);
+  let pruned = 0;
+  if (!options.signal?.aborted) {
+    for (const url of stored) {
+      if (!wanted.has(url) && !isMeta(url) && (await cache.delete(url))) pruned += 1;
+    }
+  }
+  if (progress.done > 0 || pruned > 0) {
+    const meta: Meta = { version: 1, at: now(), sizes };
     await cache.put(META_URL, new Response(JSON.stringify(meta), { headers: { 'content-type': 'application/json' } }));
   }
   return progress;
@@ -175,7 +200,8 @@ const extraTargets: PackTarget[] = [];
 export async function packTargets(): Promise<PackTarget[]> {
   const maps = await loadAvailableMaps();
   const base = typeof location === 'undefined' ? 'http://localhost/' : location.href;
-  return [...maps.map((m) => ({ mapId: m.map.id, name: m.map.displayName, ...packUrls(m, base) })), ...extraTargets];
+  // The development map is named as such, here and in the progress list, so nobody mistakes it for a real one.
+  return [...maps.map((m) => ({ mapId: m.map.id, name: m.demo ? `${m.map.displayName} (development)` : m.map.displayName, ...packUrls(m, base) })), ...extraTargets];
 }
 
 async function targetFor(mapId: string): Promise<PackTarget | undefined> {
@@ -237,7 +263,10 @@ export async function workerState(): Promise<WorkerState> {
 export function formatBytes(n: number): string {
   if (n < 1024) return `${Math.round(n)} B`;
   if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`;
-  if (n < 1024 * 1024 * 1024) return `${(n / 1024 / 1024).toFixed(n < 10 * 1024 * 1024 ? 1 : 0)} MB`;
+  if (n < 1024 * 1024 * 1024) {
+    const mb = n / 1024 / 1024;
+    return `${Number(mb.toFixed(1)) < 10 ? mb.toFixed(1) : mb.toFixed(0)} MB`; // 9.96 reads as 10 MB, not 10.0 MB
+  }
   return `${(n / 1024 / 1024 / 1024).toFixed(1)} GB`;
 }
 

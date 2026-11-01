@@ -4,7 +4,7 @@
 //
 // Strategy
 //  - the page (navigations): network first, so a new build shows up on the next visit; when the network fails or takes
-//    more than a few seconds, the copy from the last visit is used
+//    more than a few seconds, the copy from the last visit is used (and refreshed if the slow answer still arrives)
 //  - /assets/*: hashed file names never change their content, so cache first
 //  - /shots/*: from any cache (a downloaded pack), else the network; never stored here, only a pack stores pictures
 //  - anything else of ours (manifest, icons): network first, falling back to the copy
@@ -21,6 +21,13 @@ const SHELL = C.shellCacheName(BUILD);
 const SCOPE = self.registration.scope;
 /** A slow network is treated as no network when there is a copy to show instead. */
 const NAVIGATION_TIMEOUT_MS = 4000;
+
+/**
+ * Look-ups ignore `Vary`. These are static files that never differ by request header, but a server may still send
+ * `Vary: Origin` (Vite's preview server does): a copy saved by the install, which has no Origin header, would then
+ * never match the page's own module-script requests, which have one, and the app would not start offline.
+ */
+const MATCH = { ignoreVary: true };
 
 const isHtml = (response) => (response.headers.get('content-type') || '').indexOf('text/html') !== -1;
 
@@ -57,10 +64,26 @@ async function precache() {
   // All of these must arrive, or the install fails and is tried again on the next visit.
   await Promise.all(files.map((url) => cache.add(new Request(url, { cache: 'reload' }))));
 
+  // The page names only the entry. Follow the names inside it to the lazy chunks (the scheduler, a map's data), so the
+  // first visit is enough even when the learner has only opened the home screen. A chunk that does not arrive is not
+  // fatal: it is kept the first time it is used (cacheFirst) or when the page reports it (keep-loaded).
+  const seen = new Set(files);
+  const queue = files.filter((url) => new URL(url).pathname.endsWith('.js'));
+  for (let url = queue.shift(); url !== undefined; url = queue.shift()) {
+    const hit = await cache.match(url, MATCH);
+    if (!hit) continue;
+    const fresh = C.chunkRefs(await hit.text(), url, SCOPE).filter((ref) => !seen.has(ref));
+    fresh.forEach((ref) => seen.add(ref));
+    const added = await Promise.allSettled(fresh.map((ref) => cache.add(new Request(ref, { cache: 'reload' }))));
+    fresh.forEach((ref, i) => {
+      if (added[i].status === 'fulfilled' && new URL(ref).pathname.endsWith('.js')) queue.push(ref);
+    });
+  }
+
   // Fonts come with the style sheets. Only woff2: every browser that has service workers reads it.
-  const sheets = files.filter((url) => new URL(url).pathname.endsWith('.css'));
+  const sheets = [...seen].filter((url) => new URL(url).pathname.endsWith('.css'));
   for (const sheet of sheets) {
-    const css = await (await cache.match(sheet)).text();
+    const css = await (await cache.match(sheet, MATCH)).text();
     const fonts = referencesIn(css, sheet, CSS_REFS).filter((url) => !new URL(url).pathname.endsWith('.woff'));
     await Promise.allSettled(fonts.map((url) => cache.add(new Request(url, { cache: 'reload' }))));
   }
@@ -80,21 +103,26 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-async function navigation(request) {
+async function navigation(event) {
+  const request = event.request;
   const cache = await caches.open(SHELL);
-  const copy = await cache.match(SCOPE);
+  const copy = await cache.match(SCOPE, MATCH);
   const isRoot = new URL(request.url).pathname === new URL(SCOPE).pathname;
-  try {
-    const attempt = fetch(request);
-    const response = copy
-      ? await Promise.race([attempt, new Promise((_, no) => setTimeout(() => no(new Error('slow')), NAVIGATION_TIMEOUT_MS))])
-      : await attempt;
-    // Only the page itself is kept as the copy, never an error page or some other address that fell back to it.
+  // Only the page itself is kept as the copy, never an error page or some other address that fell back to it.
+  const attempt = fetch(request).then(async (response) => {
     if (response.ok && isRoot && isHtml(response)) await cache.put(SCOPE, response.clone());
     return response;
+  });
+  if (!copy) return attempt.catch(() => Response.error());
+  try {
+    const first = await Promise.race([attempt, new Promise((resolve) => setTimeout(() => resolve(null), NAVIGATION_TIMEOUT_MS))]);
+    if (first) return first;
   } catch (e) {
-    return copy || Response.error();
+    return copy; // no connection at all
   }
+  // Too slow: show the copy now, and let the answer refresh it whenever it does arrive.
+  event.waitUntil(attempt.catch(() => undefined));
+  return copy;
 }
 
 async function remember(cache, request, response) {
@@ -103,7 +131,7 @@ async function remember(cache, request, response) {
 
 async function cacheFirst(request) {
   const cache = await caches.open(SHELL);
-  const hit = await cache.match(request);
+  const hit = await cache.match(request, MATCH);
   if (hit) return hit;
   const response = await fetch(request);
   await remember(cache, request, response);
@@ -116,17 +144,17 @@ async function networkFirst(request) {
     await remember(await caches.open(SHELL), request, response);
     return response;
   } catch (e) {
-    return (await caches.match(request)) || Response.error();
+    return (await caches.match(request, MATCH)) || Response.error();
   }
 }
 
 async function fromPackThenNetwork(request) {
-  return (await caches.match(request)) || fetch(request);
+  return (await caches.match(request, MATCH)) || fetch(request);
 }
 
 self.addEventListener('fetch', (event) => {
   const kind = C.kindOf(event.request, SCOPE);
-  if (kind === 'navigate') event.respondWith(navigation(event.request));
+  if (kind === 'navigate') event.respondWith(navigation(event));
   else if (kind === 'asset') event.respondWith(cacheFirst(event.request));
   else if (kind === 'shot') event.respondWith(fromPackThenNetwork(event.request));
   else if (kind === 'other') event.respondWith(networkFirst(event.request));
@@ -146,7 +174,7 @@ async function keepLoaded(urls) {
     } catch (e) {
       continue;
     }
-    if (C.kindOf(request, SCOPE) !== 'asset' || (await cache.match(request))) continue;
+    if (C.kindOf(request, SCOPE) !== 'asset' || (await cache.match(request, MATCH))) continue;
     try {
       await remember(cache, request, await fetch(request));
     } catch (e) {

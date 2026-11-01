@@ -1,0 +1,170 @@
+/* The Settings screen (SCOPE.md §5.8): tabs so it never scrolls (§5.3), each tab one or two columns of small blocks.
+   Built from the shared primitives in components.css (.bar, .btn, .tabs, .tab, .chip, kbd) and the comps' switch
+   (design/screens.css). Choices are real radio buttons and checkboxes hidden behind flat drawings, so the keyboard and
+   screen readers get the browser's own behaviour. The shell is a grid with fr rows and cannot scroll. */
+
+.settings { position: relative; grid-template-rows: var(--bar-h) auto minmax(0, 1fr); }
+.settings a { color: inherit; text-decoration: none; }
+.settings a.btn { text-decoration: none; }
+
+/* ---- tabs ---- */
+.set-tabs { padding: var(--s2) var(--s4) 0; border-bottom: 1px solid var(--rule); min-width: 0; }
+.set-tabs .tabs { gap: var(--s5); margin-bottom: -1px; }
+.set-tabs .tab { flex: none; }
+
+/* ---- the open tab ---- */
+.set-body { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); padding: var(--s5) var(--s6); min-height: 0; min-width: 0; overflow: hidden; }
+.set-tabpanel { min-height: 0; min-width: 0; }
+.set-data { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); gap: var(--s5); min-height: 0; min-width: 0; }
+.set-panel { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s6); align-content: start; align-items: start; min-height: 0; min-width: 0; }
+.set-panel.set-one { grid-template-columns: minmax(0, 1fr); max-width: 72ch; }
+.set-col { display: grid; gap: var(--s5); align-content: start; min-width: 0; }
+.set-block { display: grid; gap: var(--s3); align-content: start; min-width: 0; }
+.set-block h2 { font-size: var(--fs-sm); font-weight: 500; color: var(--sub); border-bottom: 1px solid var(--rule); padding-bottom: var(--s2); }
+.set-help { color: var(--sub); font-size: var(--fs-sm); max-width: 64ch; overflow-wrap: anywhere; }
+.set-help kbd { color: var(--text); }
+/* what is true right now (offline or not, a value the screen does not offer): kept on a short screen, unlike the help */
+.set-status { color: var(--sub); font-size: var(--fs-sm); max-width: 64ch; overflow-wrap: anywhere; }
+.set-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s3); }
+/* one line is kept for a result, so the block does not jump when it appears */
+.set-note { min-height: calc(var(--fs-sm) * 1.5); font-size: var(--fs-sm); overflow-wrap: anywhere; }
+.set-error { color: var(--error); }
+.set-link { width: fit-content; text-decoration: none; }
+
+/* ---- one choice out of a few (Segmented.svelte) ---- */
+.set-seg { display: flex; flex-wrap: wrap; gap: 2px; min-width: 0; }
+.set-seg-grid { display: grid; grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); }
+.set-seg-opt { position: relative; display: grid; flex: 1 1 auto; min-width: 0; }
+.set-seg-opt input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.set-seg-opt span { display: grid; place-items: center; height: 36px; padding: 0 var(--s3); background: var(--surface); color: var(--text); font-size: var(--fs-md); font-weight: 500; white-space: nowrap; transition: background-color var(--t-fast) ease, color var(--t-fast) ease; }
+.set-seg-opt:hover span { background: var(--surface-hi); }
+.set-seg-opt input:checked + span { background: var(--main); color: var(--main-ink); font-weight: 600; }
+.set-seg-opt input:focus-visible + span { outline: 2px solid var(--main); outline-offset: 2px; }
+.set-data > .set-seg { width: fit-content; max-width: 100%; }
+
+/* ---- an on/off choice (Switch.svelte), drawn like the comps' .switch ---- */
+.set-switch { position: relative; display: flex; align-items: center; gap: var(--s2); min-height: 28px; min-width: 0; cursor: pointer; }
+.set-switch input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.set-switch i { position: relative; flex: none; width: 28px; height: 14px; border: 1px solid var(--rule-strong); }
+.set-switch i::after { content: ""; position: absolute; left: 1px; top: 1px; width: 10px; height: 10px; background: var(--sub); }
+.set-switch input:checked + i { border-color: var(--main); }
+.set-switch input:checked + i::after { left: 15px; background: var(--main); }
+.set-switch input:focus-visible + i { outline: 2px solid var(--main); outline-offset: 3px; }
+.set-switch-label { min-width: 0; font-weight: 500; }
+.set-switch-note { min-width: 0; font-size: var(--fs-xs); overflow-wrap: anywhere; }
+.set-switch-state { margin-left: auto; color: var(--sub); font-size: var(--fs-xs); }
+.set-maps { display: grid; gap: var(--s2); margin: 0; padding: 0; list-style: none; }
+
+/* ---- how much to remember ---- */
+.set-range { display: flex; align-items: center; gap: var(--s3); }
+.set-range input { flex: 1; min-width: 0; height: 28px; margin: 0; accent-color: var(--main); cursor: pointer; }
+.set-range output { flex: none; min-width: 4ch; text-align: right; font-weight: 600; color: var(--main); }
+.set-range-ends { display: flex; justify-content: space-between; gap: var(--s3); font-size: var(--fs-xs); }
+
+/* ---- the names (NamingTab.svelte): native radios, so the choice is a shape and not only a colour ---- */
+.set-picks { display: grid; gap: var(--s2); }
+.set-pick { display: flex; align-items: flex-start; gap: var(--s3); padding: var(--s3) var(--s4); background: var(--surface); cursor: pointer; min-width: 0; }
+.set-pick:hover { background: var(--surface-hi); }
+.set-pick:has(input:checked) { box-shadow: inset 0 0 0 1px var(--main); }
+.set-pick:has(input:focus-visible) { outline: 2px solid var(--main); outline-offset: 2px; }
+.set-pick input { flex: none; width: 16px; height: 16px; margin: 2px 0 0; accent-color: var(--main); }
+.set-pick-body { display: grid; gap: 2px; min-width: 0; }
+.set-pick-label { font-weight: 500; }
+.set-pick-example { font-size: var(--fs-sm); overflow-wrap: anywhere; }
+
+/* ---- the key map ---- */
+.set-keys { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; font-size: var(--fs-md); }
+.set-keys li { display: grid; grid-template-columns: 17ch minmax(0, 1fr); gap: var(--s3); align-items: baseline; }
+.set-keys-keys { white-space: nowrap; }
+.set-keys kbd { color: var(--text); }
+
+/* ---- data: backup, progress, offline ---- */
+.set-preview { display: grid; gap: var(--s3); }
+.set-counts { display: flex; flex-wrap: wrap; gap: 0 var(--s2); font-size: var(--fs-lg); }
+.set-counts b { color: var(--main); font-weight: 600; }
+.set-rows { display: grid; gap: var(--s2); margin: 0; padding: 0; list-style: none; }
+.set-row { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); min-width: 0; min-height: 44px; padding: var(--s2) var(--s3); background: var(--surface); }
+.set-row-main { min-width: 0; overflow-wrap: anywhere; }
+.set-row-main b { font-weight: 500; }
+.set-row-acts { display: flex; flex: none; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: var(--s2); }
+.set-pack { align-items: center; }
+.set-pack-status { display: block; font-size: var(--fs-xs); }
+.set-progress { font-size: var(--fs-xs); white-space: nowrap; }
+.set-pager { display: flex; align-items: center; gap: var(--s3); }
+.set-pager .btn { height: 30px; min-width: 36px; padding: 0 var(--s2); }
+.set-worker[data-state="ready"] { color: var(--main); }
+.set-data .btn { height: 36px; }
+
+/* ---- the question before something that cannot be undone: it covers the tabs and the panel ---- */
+.set-confirm { position: absolute; z-index: 10; inset: var(--bar-h) 0 0 0; display: grid; align-content: center; justify-items: start; gap: var(--s4); padding: var(--s6); background: var(--bg); }
+.set-confirm h2 { font-size: var(--fs-xl); font-weight: 600; letter-spacing: -0.03em; overflow-wrap: anywhere; }
+.set-confirm .set-help { font-size: var(--fs-md); color: var(--text); max-width: 56ch; }
+.set-confirm .set-actions { gap: var(--s3); }
+.btn.set-danger { background: var(--error); color: var(--main-ink); font-weight: 600; }
+.btn.set-danger:hover { background: var(--error); filter: brightness(1.1); }
+.btn.set-danger:active { filter: brightness(0.9); }
+
+/* ---- a phone in portrait: one column, the tabs on one line ---- */
+@media (max-width: 820px) and (max-aspect-ratio: 4/3) {
+  .set-hide-s { display: none; }
+  .settings .bar { gap: var(--s3); }
+  .set-tabs { padding: var(--s1) var(--s3) 0; }
+  .set-tabs .tabs { gap: var(--s2); }
+  /* six words in 336 px: tight spacing, but a tall target (the phone's 44 px is 40 here, as on the Map screen) */
+  .set-tabs .tab { height: 40px; min-width: 36px; padding: 0 2px; }
+  .set-seg-opt span { height: 40px; }
+  .set-switch { min-height: 40px; }
+  .set-data .btn, .set-pager .btn { height: 40px; }
+  .set-body { padding: var(--s3); }
+  .set-panel { grid-template-columns: minmax(0, 1fr); gap: var(--s4); }
+  .set-col { gap: var(--s4); }
+  .set-block { gap: var(--s2); }
+  .set-help { font-size: var(--fs-xs); }
+  .set-keys { gap: 4px; font-size: var(--fs-sm); }
+  .set-keys li { grid-template-columns: 16ch minmax(0, 1fr); gap: var(--s2); }
+  .set-row { min-height: 40px; padding: var(--s1) var(--s3); }
+  .set-pick { padding: var(--s2) var(--s3); }
+  .set-confirm { padding: var(--s4); }
+  .set-confirm h2 { font-size: var(--fs-lg); }
+}
+
+/* a short phone: the two words under the slider say what the help text under it says again */
+@media (max-width: 820px) and (max-aspect-ratio: 4/3) and (max-height: 700px) {
+  .set-range-ends { display: none; }
+}
+
+/* a narrow phone: the keys list is one column of two-line rows */
+@media (max-width: 400px) and (max-aspect-ratio: 4/3) {
+  .set-seg-opt span { padding: 0 var(--s2); font-size: var(--fs-sm); }
+  .set-row { flex-wrap: wrap; }
+  .set-row-acts { justify-content: flex-start; }
+}
+
+/* ---- a phone on its side: little height, so the explanations go and the controls stay ---- */
+@media (max-height: 520px) and (min-aspect-ratio: 4/3) {
+  .set-tabs { padding-top: var(--s1); }
+  .set-tabs .tab { height: 28px; }
+  .set-body { padding: var(--s3) var(--s4); }
+  .set-data { gap: var(--s3); }
+  .set-panel { gap: var(--s4) var(--s5); }
+  .set-col { gap: var(--s3); }
+  .set-block { gap: var(--s2); }
+  .set-block h2 { padding-bottom: var(--s1); }
+  .set-block > .set-help, .set-range-ends { display: none; }
+  .set-preview > .set-help { font-size: var(--fs-xs); }
+  .set-seg-opt span { height: 30px; padding: 0 var(--s2); font-size: var(--fs-sm); }
+  .set-data .btn { height: 30px; }
+  .set-switch { min-height: 24px; }
+  .set-picks { gap: var(--s1); }
+  .set-pick { padding: var(--s2) var(--s3); }
+  .set-row { min-height: 36px; padding: var(--s1) var(--s3); }
+  .set-keys { gap: 3px; font-size: var(--fs-sm); }
+  .set-counts { font-size: var(--fs-md); }
+  .set-confirm { padding: var(--s3) var(--s4); gap: var(--s3); }
+  .set-confirm h2 { font-size: var(--fs-lg); }
+}
+
+@media (forced-colors: active) {
+  .set-seg-opt input:checked + span, .set-pick:has(input:checked) { outline: 2px solid Highlight; outline-offset: -2px; }
+  .set-switch i, .set-seg-opt span { border: 1px solid ButtonText; }
+}

@@ -13,10 +13,10 @@
   let { label, checked, onchange, note }: Props = $props();
 </script>
 
-<label class="st-switch">
+<label class="set-switch">
   <input type="checkbox" role="switch" {checked} onchange={(e) => onchange(e.currentTarget.checked)} />
   <i aria-hidden="true"></i>
-  <span class="st-switch-label">{label}</span>
-  {#if note}<span class="sub st-switch-note">{note}</span>{/if}
-  <span class="st-switch-state" aria-hidden="true">{checked ? 'on' : 'off'}</span>
+  <span class="set-switch-label">{label}</span>
+  {#if note}<span class="sub set-switch-note">{note}</span>{/if}
+  <span class="set-switch-state" aria-hidden="true">{checked ? 'on' : 'off'}</span>
 </label>
