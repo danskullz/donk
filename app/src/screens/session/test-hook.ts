@@ -65,8 +65,22 @@ export function describeView(view: RunnerView | null): ViewSnapshot | null {
 
 type Hooked = { snapshot: () => ViewSnapshot | null; lastSession: () => unknown };
 
+/** Development and the e2e build only; a production build has neither the hook nor the address overrides below. */
+const DEV_HOOKS = import.meta.env.DEV || import.meta.env.VITE_DEMO === '1';
+
+/**
+ * `?flash=1500` in the address: show every Speed call picture for exactly this long, so a browser test does not have to
+ * wait out (or race) the item's own time. Ignored in production builds and for anything that is not a time in
+ * 100 ms to 10 s.
+ */
+export function flashFromQuery(query: URLSearchParams, enabled: boolean = DEV_HOOKS): number | undefined {
+  const raw = enabled ? query.get('flash') : null;
+  const ms = raw === null || raw.trim() === '' ? Number.NaN : Number(raw);
+  return Number.isFinite(ms) && ms >= 100 && ms <= 10_000 ? ms : undefined;
+}
+
 export function installTestHook(read: () => RunnerView | null): void {
-  if (import.meta.env.DEV || import.meta.env.VITE_DEMO === '1') {
+  if (DEV_HOOKS) {
     const hook: Hooked = {
       snapshot: () => describeView(read()),
       // What the Summary screen would be handed (app/last-session.ts), for the tests of the hand-off.

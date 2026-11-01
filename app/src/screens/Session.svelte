@@ -1,21 +1,24 @@
 <script lang="ts">
-  import { startSession, type StartedSession } from '../app/start-session';
+  import { reportSession, startSession, type StartedSession } from '../app/start-session';
+  import { getSettings } from '../app/settings';
   import type { Point } from '../core/geometry';
   import { fitView, shapesFor } from '../core/mapview';
   import { entriesFor, pickShot, type AnswerInput } from '../core/quiz';
-  import type { RunnerView } from '../core/runner';
+  import type { RunnerView, SessionSummary } from '../core/runner';
   import type { Callout, Shot } from '../core/schema';
   import type { SaveStatus } from '../core/store';
   import { itemKey } from '../core/types';
   import AskChoice from './session/AskChoice.svelte';
   import AskPoint from './session/AskPoint.svelte';
+  import AskSpeed from './session/AskSpeed.svelte';
   import AskTyped from './session/AskTyped.svelte';
   import AskViews from './session/AskViews.svelte';
+  import Contrast from './session/Contrast.svelte';
   import Done from './session/Done.svelte';
-  import { MODE_LABEL, seconds } from './session/helpers';
+  import { MODE_LABEL, motionReduced, seconds } from './session/helpers';
   import PointReveal from './session/PointReveal.svelte';
   import Reveal from './session/Reveal.svelte';
-  import { installTestHook } from './session/test-hook';
+  import { flashFromQuery, installTestHook } from './session/test-hook';
 
   let { mapId, zone }: { mapId: string; zone?: string | undefined } = $props();
 
@@ -34,7 +37,9 @@
 
   installTestHook(() => view);
 
-  async function begin(id: string) {
+  /** `earlyPractice`: "Practise anyway", the items closest to due when nothing is (the end screen offers it). */
+  async function begin(id: string, earlyPractice = false) {
+    // A session being replaced was left on its end screen, where the summary was already handed over.
     const mine = ++generation;
     boot = 'loading';
     session = null;
@@ -46,6 +51,8 @@
         zone,
         seed: seed === null ? undefined : Number(seed),
         includeDraft: query.has('draft'),
+        earlyPractice,
+        flashMs: flashFromQuery(query),
         onSaveStatus: (s) => (save = s),
       });
       if (mine !== generation) return;
@@ -68,6 +75,26 @@
       generation += 1;
     };
   });
+
+  // The Summary screen is handed every session that ends (SCOPE §4.3 step 5): on the end screen, and also when the
+  // learner walks away mid-session (browser back, a link), unless nothing at all had happened yet, so that opening
+  // and leaving a session does not wipe out the summary of the last real one. What was answered is saved already.
+  let reported: SessionSummary | null = null;
+  $effect(() => {
+    if (session && view?.phase === 'done' && view.summary !== reported) {
+      reported = view.summary;
+      reportSession(session, view.summary);
+    }
+  });
+  $effect(() => () => {
+    if (!session || !view || view.phase === 'done') return;
+    const ended = session.runner.leave();
+    if (ended.phase === 'done' && (ended.summary.answered > 0 || ended.summary.introduced.length > 0)) reportSession(session, ended.summary);
+  });
+
+  // Speed call draws its own countdown, so it needs to know whether motion is wanted. Settings cannot change while a
+  // session is on screen, so one reading at the start is enough.
+  const reduced = motionReduced(getSettings().reducedMotion, typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches);
 
   // ---- what the screens need, derived once ----
   const map = $derived(session?.data.map ?? null);
@@ -105,6 +132,10 @@
   const leave = () => {
     if (session && view?.phase !== 'done') view = session.runner.leave();
   };
+  // Speed call: the picture has been up for its whole time. From here the question can be answered and is timed.
+  const flashEnded = () => {
+    if (session && view?.phase === 'question' && view.flashing) view = session.runner.flashEnded();
+  };
   const home = () => {
     location.hash = '#/';
   };
@@ -115,10 +146,10 @@
     if (!phase) return;
     changedAt = performance.now();
     void session?.saver.flush();
-    // Keyboard focus follows the screen: the continue button on a reveal, the typed field by itself, else the shell.
+    // Keyboard focus follows the screen: the continue button on a card or reveal, the typed field by itself, else the shell.
     const typedQuestion = view?.phase === 'question' && view.prompt.mode === 'name-typed';
     queueMicrotask(() => {
-      if (phase === 'reveal' || phase === 'intro') primary?.focus();
+      if (phase === 'reveal' || phase === 'intro' || phase === 'contrast') primary?.focus();
       else if (!typedQuestion) root?.focus();
     });
   });
@@ -130,13 +161,15 @@
     if (!s || !v || v.phase === 'done') return;
     const upcoming = s.runner.upcoming;
     const callout = upcoming ? s.playable.find((c) => c.id === upcoming.calloutId) : undefined;
-    if (!upcoming || !callout || callout.shots.length === 0) return;
-    let shot: Shot | undefined;
-    if (upcoming.type === 'intro') shot = primaryShot(callout) ?? undefined;
-    else if (upcoming.mode === 'name-mc' || upcoming.mode === 'name-typed' || upcoming.mode === 'where-am-i') {
-      shot = pickShot(callout, itemKey(callout.id, upcoming.mode), s.derived.items.get(itemKey(callout.id, upcoming.mode))?.answers ?? 0);
+    if (!upcoming || !callout) return;
+    const shots: (Shot | null)[] = [];
+    if (upcoming.type === 'intro') shots.push(primaryShot(callout));
+    else if (upcoming.type === 'contrast') shots.push(primaryShot(callout), primaryShot(s.playable.find((c) => c.id === upcoming.otherId) ?? callout));
+    else if (callout.shots.length > 0 && (upcoming.mode === 'name-mc' || upcoming.mode === 'name-typed' || upcoming.mode === 'where-am-i' || upcoming.mode === 'speed')) {
+      const key = itemKey(callout.id, upcoming.mode);
+      shots.push(pickShot(callout, key, s.derived.items.get(key)?.answers ?? 0));
     }
-    if (shot) new Image().src = s.data.shotUrl(shot.file);
+    for (const shot of shots) if (shot) new Image().src = s.data.shotUrl(shot.file);
   });
 
   // Time away from the tab does not count against an answer.
@@ -155,7 +188,7 @@
       if (view.phase !== 'done') leave();
       return;
     }
-    if (view.phase === 'intro' || view.phase === 'reveal') {
+    if (view.phase === 'intro' || view.phase === 'contrast' || view.phase === 'reveal') {
       if (key === ' ' || key === 'enter') {
         // Handled here so a focused button does not also click and move on twice.
         e.preventDefault();
@@ -172,7 +205,8 @@
     } else if (key === 's') {
       e.preventDefault();
       skip();
-    } else if (!inField && (view.prompt.mode === 'name-mc' || view.prompt.mode === 'read-map' || view.prompt.mode === 'which-view')) {
+    } else if (!inField && !view.flashing && (view.prompt.mode === 'name-mc' || view.prompt.mode === 'read-map' || view.prompt.mode === 'which-view' || view.prompt.mode === 'speed')) {
+      // Speed call takes no answer while its picture is up: the runner would ignore the key, and so does this.
       const i = Number(key) - 1;
       const options = view.prompt.mode === 'which-view' ? view.prompt.options.map((o) => o.callout) : view.prompt.options;
       const picked = Number.isInteger(i) ? options[i] : undefined;
@@ -192,14 +226,22 @@
   const counter = $derived.by(() => {
     if (!view) return '';
     if (view.phase === 'intro') return `new ${view.introIndex} / ${view.introTotal}`;
+    if (view.phase === 'contrast') return 'compare';
     const n = view.phase === 'question' ? view.progress.done + 1 : view.progress.done;
     return `${n} / ${view.progress.total}`;
   });
-  const crumb = $derived(view?.phase === 'question' || view?.phase === 'reveal' ? MODE_LABEL[view.prompt.mode] : view?.phase === 'intro' ? 'New callouts' : 'Done');
+  const crumb = $derived(
+    view?.phase === 'question' || view?.phase === 'reveal' ? MODE_LABEL[view.prompt.mode] : view?.phase === 'intro' ? 'New callouts' : view?.phase === 'contrast' ? 'Mixed up' : 'Done',
+  );
   const announcement = $derived.by(() => {
     if (!view) return '';
     if (view.phase === 'intro') return `New callout ${view.introIndex} of ${view.introTotal}: ${view.callout.name}. ${view.callout.blurb}`;
-    if (view.phase === 'question') return `Question ${view.progress.done + 1} of ${view.progress.total}. ${MODE_LABEL[view.prompt.mode]}.`;
+    if (view.phase === 'contrast') return `Mixed up ${view.confusions} times: ${view.a.name} and ${view.b.name}. ${view.a.name}: ${view.a.blurb} ${view.b.name}: ${view.b.blurb}`;
+    if (view.phase === 'question') {
+      const where = `Question ${view.progress.done + 1} of ${view.progress.total}. ${MODE_LABEL[view.prompt.mode]}.`;
+      // The picture of a Speed call is gone before it can be answered: say so, because nothing else on screen does.
+      return view.prompt.mode !== 'speed' ? where : view.flashing ? `${where} Look at the picture.` : `${where} The picture is gone. Choose the name.`;
+    }
     if (view.phase === 'reveal') {
       const { result, prompt } = view;
       if (result.correct) return `Correct. ${prompt.target.name}.`;
@@ -235,6 +277,7 @@
     <header class="bar">
       <span class="brand">callouts</span>
       <span class="crumb"><b>{map.displayName}</b> · {crumb}</span>
+      {#if session.plan.earlyPractice}<span class="chip">early practice</span>{/if}
       {#if session.volatile}<span class="chip warn">progress is not being saved</span>{:else if save.failing}<span class="chip warn">not saved, retrying</span>{/if}
       <span class="grow"></span>
       <div class="seg" role="progressbar" aria-label="Question" aria-valuemin="0" aria-valuemax={view.progress.total} aria-valuenow={view.progress.done}>
@@ -262,6 +305,17 @@
         proj={map.projection}
         mapName={map.displayName}
       />
+    {:else if view.phase === 'contrast'}
+      <Contrast
+        a={view.a}
+        b={view.b}
+        shotA={primaryShot(view.a)}
+        shotB={primaryShot(view.b)}
+        neighboursA={neighbours(view.a)}
+        neighboursB={neighbours(view.b)}
+        confusions={view.confusions}
+        {shotUrl}
+      />
     {:else if view.phase === 'question'}
       {@const prompt = view.prompt}
       {#if prompt.mode === 'name-mc' || prompt.mode === 'read-map'}
@@ -270,6 +324,8 @@
         {#key prompt}<AskViews {prompt} hint={view.hint} number={view.progress.done + 1} {shotUrl} onchoose={choose} />{/key}
       {:else if prompt.mode === 'name-typed'}
         {#key prompt}<AskTyped {prompt} hint={view.hint} number={view.progress.done + 1} {shotUrl} {entries} zoneOf={(id) => zoneName(byId.get(id)?.zone ?? '')} onsubmit={(text) => answer({ kind: 'typed', text })} />{/key}
+      {:else if prompt.mode === 'speed'}
+        {#key prompt}<AskSpeed {prompt} hint={view.hint} number={view.progress.done + 1} flashing={view.flashing} {reduced} {shotUrl} onhide={flashEnded} onchoose={choose} />{/key}
       {:else if prompt.mode === 'pin' || prompt.mode === 'where-am-i'}
         {#key prompt}<AskPoint {prompt} hint={view.hint} number={view.progress.done + 1} {shotUrl} {shapes} {fit} proj={map.projection} {levels} mapName={map.displayName} {zoneMembers} onpoint={place} />{/key}
       {/if}
@@ -298,7 +354,17 @@
         />
       {/if}
     {:else}
-      <Done summary={view.summary} note={session.plan.note} playableCount={playable.length} name={nameOf} onagain={() => begin(mapId)} ondone={home} />
+      <Done
+        summary={view.summary}
+        note={session.plan.note}
+        playableCount={playable.length}
+        canPractise={session.canPracticeEarly}
+        name={nameOf}
+        onagain={() => begin(mapId, session?.plan.earlyPractice === true)}
+        onpractise={() => begin(mapId, true)}
+        ondone={home}
+        onsummary={() => (location.hash = `#/summary/${mapId}`)}
+      />
     {/if}
 
     {#if view.phase !== 'done'}
@@ -306,7 +372,7 @@
         <span class="hide-s"><kbd>esc</kbd> leave</span>
         <span class="grow"></span>
         {#if view.phase === 'question'}
-          <button class="btn" type="button" disabled={view.hint !== null} onclick={hint}>hint <kbd class="hide-s">{typedQuestion ? 'alt+h' : 'h'}</kbd></button>
+          <button class="btn" type="button" disabled={view.hint !== null || view.flashing} onclick={hint}>hint <kbd class="hide-s">{typedQuestion ? 'alt+h' : 'h'}</kbd></button>
           <button class="btn" type="button" onclick={skip}>skip <kbd class="hide-s">{typedQuestion ? 'alt+s' : 's'}</kbd></button>
         {:else}
           <span class="hide-s"><kbd>Space</kbd></span>
