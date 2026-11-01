@@ -1,0 +1,82 @@
+# Continuous integration for the app (everything is run from app/).
+#
+# What this checks: types, unit tests, the production build, the 150 KB script budget, the runes-only rule, the
+# dependency licence table, and the content in data/.
+#
+# What it does NOT run: the Playwright browser tests (`pnpm e2e`, `pnpm e2e:editor`). Both configs drive the Microsoft
+# Edge that ships with Windows (`channel: 'msedge'`), which a Linux runner does not have, and `pnpm e2e` builds a
+# separate `--mode e2e` bundle with the synthetic map. Run those on the machine that has Edge. A green run here
+# therefore says nothing about how the screens look or behave in a browser.
+#
+# Only two actions are used, both from GitHub, each pinned to a major version. pnpm is installed with npm, as
+# ADR 0001 describes (Node 26 no longer ships corepack). No dependency cache: an install takes seconds, and
+# a cache is one more thing that can go stale.
+
+name: ci
+
+on:
+  push:
+  pull_request:
+
+# A newer push to the same branch makes the run in progress pointless.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: app
+
+jobs:
+  # `pnpm check` is its own job on purpose. It is red on main while the in-flight edits to src/screens/Session.svelte,
+  # src/screens/session/test-hook.ts and src/core/mapui.ts are unfinished (8 errors when this was written). Alone in a
+  # job, its failure shows up as its own red mark and does not stop the checks in `verify` from running and reporting.
+  typecheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # TEMPORARY SWITCH. Left off (strict) because a green tick over real type errors is the thing CI exists to
+    # prevent, and the red is accurate until those edits land. If the red is in the way meanwhile, uncomment the next
+    # line: the job still runs and still shows its errors in the log, but the run no longer fails because of it. Delete
+    # the line again as soon as `pnpm check` is clean, or type errors will slip through unnoticed.
+    # continue-on-error: true
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 26
+      - run: npm install -g pnpm@12.16.1
+      - run: pnpm install --frozen-lockfile
+      - name: Type-check (svelte-check + tsc)
+        run: pnpm check
+
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 26
+      - run: npm install -g pnpm@12.16.1
+      - run: pnpm install --frozen-lockfile
+      # Tests that need the real Mirage nav mesh skip themselves here: assets/ (Valve media) is never in the repository.
+      - name: Unit tests
+        run: pnpm test
+      - name: Production build
+        run: pnpm build
+      # Reads dist/, so it must come after the build. Fails if the initial JavaScript is over 150 KB gzipped.
+      - name: Script budget (SCOPE.md 5.6)
+        run: pnpm check:budget
+      - name: Runes-only syntax guard (ADR 0001, rule 2)
+        run: pnpm check:runes
+      - name: Licence table (THIRD-PARTY.md)
+        run: pnpm check:licences
+      - name: Content validation
+        run: pnpm content:validate
