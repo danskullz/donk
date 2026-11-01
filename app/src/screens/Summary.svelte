@@ -215,7 +215,7 @@
             </ul>
           </section>
         {/if}
-        {#if rows[1] > 0}
+        {#if (rows[1] ?? 0) > 0}
           <section aria-label="New confusions">
             <h2>Mixed up{#if mixed.length < mixedAll.length}<span class="sub"> and {mixedAll.length - mixed.length} more</span>{/if}</h2>
             {#if mixedAll.length > 0}

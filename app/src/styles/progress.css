@@ -1,0 +1,150 @@
+/* The Progress screen (SCOPE.md §5.1): four small multiples on one screen, a totals line above them. No comp exists; it is
+   built from the Summary's headed lists and the Study screen's pager and view tabs, in the same grid rules. Nothing
+   scrolls (SCOPE §5.3): the lists show as many rows as fit and page; the charts are drawn to the size of their box
+   (Progress.svelte measures it). The mastery swatch (.mgl) is in study.css. */
+
+.pg { grid-template-rows: var(--bar-h) minmax(0, 1fr); }
+.pg a { color: inherit; }
+.pg .crumb a { text-decoration: none; }
+.pg .crumb a:hover { color: var(--text); text-decoration: underline; }
+
+.pg-notice { display: grid; place-content: center; justify-items: start; gap: var(--s3); padding: var(--s6); }
+.pg-notice h1 { font-size: var(--fs-xl); font-weight: 600; letter-spacing: -0.03em; }
+.pg-notice p { color: var(--sub); max-width: 52ch; }
+.pg-notice a { color: var(--text); text-decoration: underline; }
+
+/* ---- the two little tab rows: which log (development builds), and which panel (a phone upright) ---- */
+.pg-vt { height: 32px; padding: 0 var(--s3); background: var(--bg); color: var(--sub); font-weight: 500; font-size: var(--fs-sm); transition: background-color var(--t-fast) ease, color var(--t-fast) ease; }
+.pg-vt:hover { color: var(--text); background: var(--surface-hi); }
+.pg-vt[aria-pressed="true"] { color: var(--main); box-shadow: inset 0 -2px 0 var(--main); }
+.pg-scope { display: flex; gap: 2px; }
+.pg-views { display: none; }
+
+/* ---- shell: totals on top, two columns of two panels ---- */
+.pg-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); grid-template-areas: "totals totals" "a b"; gap: var(--s4) var(--s6); padding: var(--s5) var(--s6); min-height: 0; }
+.pg-totals { grid-area: totals; display: flex; flex-wrap: wrap; align-items: center; gap: var(--s1) var(--s5); min-height: 24px; font-size: var(--fs-sm); color: var(--sub); }
+.pg-totals b { color: var(--text); font-weight: 500; }
+.pg-totals a { color: var(--text); text-decoration: underline; }
+.pg-col { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s5); min-height: 0; min-width: 0; }
+.pg-col.a { grid-area: a; grid-template-rows: minmax(0, 1.35fr) minmax(0, 1fr); }
+.pg-col.b { grid-area: b; grid-template-rows: minmax(0, 1.4fr) minmax(0, 1fr); }
+
+.pg-panel { container: pgp / inline-size; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto; gap: var(--s2); min-height: 0; min-width: 0; }
+.pg-panel h2 { display: flex; align-items: baseline; gap: var(--s3); padding-bottom: var(--s2); border-bottom: 1px solid var(--rule); font-size: var(--fs-sm); font-weight: 500; color: var(--sub); white-space: nowrap; overflow: hidden; }
+.pg-panel h2 .sub { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: var(--fs-xs); }
+.pg-none { font-size: var(--fs-sm); max-width: 56ch; }
+.pg-foot { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s1) var(--s2); font-size: var(--fs-xs); color: var(--sub); }
+
+/* the list rows: --pg-row is what Progress.svelte divides the room by to see how many fit */
+.pg-rows { --pg-row: 40px; display: grid; align-content: start; min-height: 0; overflow: hidden; }
+.pg-step { display: grid; place-items: center; width: 28px; height: 28px; background: var(--surface); color: var(--text); transition: background-color var(--t-fast) ease; }
+.pg-step svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+.pg-step:hover:not(:disabled) { background: var(--surface-hi); }
+.pg-step:active:not(:disabled) { background: var(--surface-lo); }
+.pg-step:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ---- mastery by map ---- */
+.pg-map { display: grid; grid-template-columns: minmax(0, 14ch) minmax(0, 1fr) 4ch auto; align-items: center; gap: var(--s3); height: var(--pg-row); padding: 0 var(--s2); border-bottom: 1px solid var(--rule); text-decoration: none; transition: background-color var(--t-fast) ease; }
+.pg-map:hover { background: var(--surface-hi); }
+.pg-mname { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-md); font-weight: 500; }
+.pg-pct { color: var(--main); font-weight: 600; text-align: right; }
+.pg-meta { display: flex; gap: var(--s3); justify-content: flex-end; font-size: var(--fs-xs); white-space: nowrap; }
+.pg-meta .due { color: var(--main); }
+.pg-map .pg-none { grid-column: 2 / -1; }
+/* a state's share of the bar is its count, so the bar reads as the map's make-up; the swatch patterns carry the state without colour */
+.pg-bar { display: flex; gap: 1px; height: 12px; background: var(--rule-strong); }
+.pg-bar .mgl { flex: var(--n, 1) 1 0; width: auto; min-width: 2px; height: 100%; border: 0; }
+.pg-legend { display: inline-flex; flex-wrap: wrap; gap: 2px var(--s3); margin-left: auto; }
+.pg-legend > span { display: inline-flex; align-items: center; gap: 5px; }
+.pg-legend .mgl { width: 10px; height: 10px; }
+
+/* in a panel too narrow for one line a row takes two */
+@container pgp (max-width: 440px) {
+  .pg-rows { --pg-row: 52px; }
+  .pg-map { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "name pct" "bar meta"; row-gap: 5px; align-content: center; }
+  .pg-mname { grid-area: name; }
+  .pg-pct { grid-area: pct; width: auto; }
+  .pg-bar { grid-area: bar; }
+  .pg-meta { grid-area: meta; }
+  .pg-map .pg-none { grid-area: bar / bar / meta / meta; }
+}
+
+/* ---- mixed up most ---- */
+.pg-mixed .pg-rows { --pg-row: 34px; }
+.pg-pair { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); height: var(--pg-row); padding: 0 var(--s2); border-bottom: 1px solid var(--rule); min-width: 0; }
+.pg-names { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-md); }
+.pg-count { flex: none; font-size: var(--fs-xs); white-space: nowrap; }
+
+/* ---- speed ---- */
+.pg-speed { grid-template-rows: auto auto minmax(0, 1fr) auto; }
+.pg-now { display: flex; align-items: baseline; gap: var(--s3); min-width: 0; }
+.pg-big { flex: none; font-size: var(--fs-xl); line-height: 1.1; font-weight: 600; letter-spacing: -0.03em; color: var(--main); }
+.pg-delta { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-sm); }
+.pg-chart { min-height: 0; min-width: 0; overflow: hidden; }
+.pg-chart svg { display: block; }
+.pg-chart .base { stroke: var(--rule-strong); stroke-width: 1; }
+.pg-chart .ln { fill: none; stroke: var(--main); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.pg-chart .dot { fill: var(--main); }
+.pg-chart .dot.last { fill: var(--bg); stroke: var(--main); stroke-width: 2; }
+.pg-axis { display: flex; justify-content: space-between; }
+
+/* ---- the heat-grid: one square a day, a week a column, newest at the right ---- */
+.pg-heatbox { display: grid; align-content: start; justify-content: start; min-height: 0; min-width: 0; overflow: hidden; }
+.pg-grid { display: grid; gap: 2px; }
+.pg-cell { display: block; background: var(--m-new); }
+.pg-cell[data-level="1"] { background: color-mix(in srgb, var(--main) 26%, var(--m-new)); }
+.pg-cell[data-level="2"] { background: color-mix(in srgb, var(--main) 48%, var(--m-new)); }
+.pg-cell[data-level="3"] { background: color-mix(in srgb, var(--main) 72%, var(--m-new)); }
+.pg-cell[data-level="4"] { background: var(--main); }
+.pg-month { align-self: end; overflow: visible; font-size: var(--fs-xs); line-height: 14px; color: var(--sub); white-space: nowrap; }
+.pg-wd { grid-column: 1; align-self: center; font-size: 10px; line-height: 1; color: var(--sub); }
+.pg-key { display: inline-flex; align-items: center; gap: 3px; margin-left: auto; font-size: var(--fs-xs); font-weight: 400; }
+.pg-key .pg-cell { width: 10px; height: 10px; }
+.pg-key span:first-child { margin-right: 3px; }
+.pg-key span:last-child { margin-left: 3px; }
+
+/* ---- a phone in portrait: the four panels take turns in one slot ---- */
+@media (max-width: 820px) and (max-aspect-ratio: 4/3) {
+  .pg-hide-s { display: none; }
+  .pg-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr); grid-template-areas: "totals" "views" "panel"; gap: var(--s3); padding: var(--s3); }
+  .pg-totals { gap: 2px var(--s4); font-size: var(--fs-xs); }
+  .pg-views { grid-area: views; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--s2); }
+  .pg-views .pg-vt { height: 40px; padding: 0 var(--s1); background: var(--surface); }
+  .pg-col { display: contents; }
+  .pg-panel { grid-area: panel; display: none; }
+  .pg-body[data-view="maps"] .pg-maps, .pg-body[data-view="mixed"] .pg-mixed, .pg-body[data-view="speed"] .pg-speed, .pg-body[data-view="heat"] .pg-heat { display: grid; }
+  .pg-mixed .pg-rows { --pg-row: 44px; }
+  .pg-step { width: 40px; height: 36px; }
+  .pg-scope .pg-vt { height: 36px; padding: 0 var(--s2); }
+  .pg-notice { padding: var(--s4); }
+}
+
+/* ---- a phone on its side: the same four panels, compressed ---- */
+@media (max-height: 520px) and (min-aspect-ratio: 4/3) {
+  .pg-body { gap: var(--s2) var(--s4); padding: var(--s3) var(--s4); }
+  .pg-totals { min-height: 18px; font-size: var(--fs-xs); }
+  .pg-col { gap: var(--s3); }
+  .pg-panel { gap: var(--s1); }
+  .pg-panel h2 { padding-bottom: var(--s1); }
+  .pg-rows { --pg-row: 32px; }
+  .pg-mixed .pg-rows { --pg-row: 26px; }
+  .pg-map { gap: var(--s2); }
+  .pg-legend, .pg-key, .pg-axis { display: none; }
+  .pg-big { font-size: var(--fs-lg); }
+  .pg-step { width: 24px; height: 22px; }
+  .pg-notice { padding: var(--s3) var(--s4); }
+}
+@media (max-height: 520px) and (min-aspect-ratio: 4/3) {
+  @container pgp (max-width: 440px) {
+    .pg-rows { --pg-row: 36px; }
+    .pg-map { row-gap: 3px; }
+  }
+}
+
+@media (forced-colors: active) {
+  .pg-vt[aria-pressed="true"] { outline: 2px solid Highlight; outline-offset: -2px; }
+  .pg-cell { border: 1px solid GrayText; }
+  .pg-cell:not([data-level="0"]) { background: Highlight; }
+  .pg-chart .ln { stroke: Highlight; }
+  .pg-chart .dot { fill: Highlight; }
+}
