@@ -188,6 +188,7 @@
       </button>
       <span class="chip hide-s">{hardMode ? `on · ${plural(hardSpots, 'spot')}` : hardSpots > 0 ? `off · ${hardSpots} hidden` : 'off · no hard spots yet'}</span>
     {/if}
+    {#if learner?.failed}<span class="chip warn hide-s">progress could not be read</span>{/if}
     {#if progress && progress.due > 0}<span class="chip due">{progress.due} due</span>{/if}
   </header>
 

@@ -76,6 +76,8 @@ a.card:focus-visible { outline: 2px solid var(--main); outline-offset: -2px; }
 
 /* short landscape (a phone on its side): the desktop layout, compressed */
 @media (max-height: 520px) and (min-aspect-ratio: 4/3) {
+  /* session.css squeezes every bar's spacer to nothing at this size (its own bars hold a progress strip); not this one */
+  .home .bar .grow { flex: 1; }
   .today { padding: var(--s2) var(--s4); }
   .today .big { font-size: 18px; }
   .picker { gap: var(--s2); padding: var(--s1) var(--s4) var(--s3); }

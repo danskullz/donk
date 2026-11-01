@@ -65,7 +65,7 @@
     <div class="keys">
       <span>click or tap where it is</span>
       <span>scroll or pinch to zoom, drag to pan</span>
-      <span><kbd>tab</kbd> then <kbd>enter</kbd> picks a region by name</span>
+      <span><kbd>tab</kbd> in, arrows move, <kbd>enter</kbd> picks</span>
       <span><kbd>h</kbd> hint: lights up the zone, one rating step</span>
     </div>
   </div>

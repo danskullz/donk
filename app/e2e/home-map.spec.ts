@@ -121,6 +121,22 @@ test.describe('Home', () => {
     await expect(c.locator('.tag')).not.toHaveText(/start here/i);
   });
 
+  test('a narrow card puts its marker in the stats line (the corner tag would cover the percent) and says "Core 0/5"', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 640 });
+    await home(page);
+    const c = card(page, 'de_test');
+    await expect(c.locator('.tag')).toBeHidden();
+    await expect(c.locator('.pct')).toBeVisible();
+    expect(await c.locator('.stat').innerText()).toMatch(/start here · core 0\/5/i);
+  });
+
+  test('on a short landscape phone the links stay at the right of the bar', async ({ page }) => {
+    await page.setViewportSize({ width: 640, height: 360 });
+    await home(page);
+    const settings = (await page.getByRole('link', { name: 'Settings' }).boundingBox()) as { x: number; width: number };
+    expect(settings.x + settings.width).toBeGreaterThan(640 - 40);
+  });
+
   test('draws the mini-map of a map that has callouts, filled by mastery', async ({ page }) => {
     await seedVeteran(page);
     await home(page);
