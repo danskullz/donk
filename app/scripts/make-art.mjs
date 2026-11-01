@@ -11,9 +11,10 @@
 
 import path from 'node:path';
 import { parseArgs } from 'node:util';
-import { folders, startCore } from './lib/boot.mjs';
+import { cliArgs, folders, startCore } from './lib/boot.mjs';
 
 const { values } = parseArgs({
+  args: cliArgs(),
   options: {
     map: { type: 'string', multiple: true },
     'no-check': { type: 'boolean' },
@@ -25,6 +26,12 @@ const { values } = parseArgs({
   },
   allowPositionals: false,
 });
+// A number that is not one would turn the generator's tolerance into NaN and write nothing sensible.
+const bad = [['tolerance', 0.1, 50], ['budget', 1000, 50_000_000]].filter(([name, lo, hi]) => values[name] !== undefined && !(Number(values[name]) >= lo && Number(values[name]) <= hi));
+if (bad.length > 0) {
+  for (const [name, lo, hi] of bad) console.error(`--${name} must be a number from ${lo} to ${hi}, not "${values[name]}"`);
+  process.exit(2);
+}
 const dirs = folders();
 const dataDir = values.data ?? dirs.data;
 const job = {
@@ -43,10 +50,11 @@ let failed = false;
 try {
   const { runArt } = await server.ssrLoadModule('/scripts/lib/art-run.ts');
   const t0 = performance.now();
-  const { reports, problems } = await runArt(job);
+  const { reports, problems, warnings } = await runArt(job);
+  for (const w of warnings) console.warn(`warning: ${w}`);
   for (const p of problems) console.error(`error: ${p}`);
   const total = reports.reduce((s, r) => s + r.bytes, 0);
-  console.log(`\n${reports.length} map${reports.length === 1 ? '' : 's'}, ${(total / 1024).toFixed(1)} KB, ${((performance.now() - t0) / 1000).toFixed(1)} s${problems.length ? `, ${problems.length} failed` : ''}`);
+  console.log(`\n${reports.length} map${reports.length === 1 ? '' : 's'}, ${(total / 1024).toFixed(1)} KB, ${((performance.now() - t0) / 1000).toFixed(1)} s${warnings.length ? `, ${warnings.length} warning${warnings.length === 1 ? '' : 's'}` : ''}${problems.length ? `, ${problems.length} failed` : ''}`);
   if (reports.length === 0 && problems.length === 0) console.error(`error: no nav meshes under ${job.assetsDir}/nav (run the extraction first: content-tools/README.md)`);
   failed = problems.length > 0 || reports.length === 0;
 } catch (e) {

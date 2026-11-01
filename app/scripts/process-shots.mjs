@@ -11,6 +11,7 @@
 //   --force            replace entries that differ from the ones already in the file
 //   --dry-run          say what would happen, write nothing
 //   --quality <1-100>  AVIF quality to start from (default 60); --max-kb <n> size budget (default 90), --min-quality <n> (default 40)
+//   --effort <0-9>     AVIF encoder effort: higher is slower and smaller (default 4)
 //   --webp             also write a WebP beside each AVIF
 //   --date <YYYY-MM-DD>  `captured` for every entry (default: the date of each PNG);  --build <id>  `build` (default: the map's gameBuild)
 //   --data <dir> --shots <dir>   other content and shots folders
@@ -19,9 +20,10 @@
 
 import path from 'node:path';
 import { parseArgs } from 'node:util';
-import { folders, startCore } from './lib/boot.mjs';
+import { cliArgs, folders, startCore } from './lib/boot.mjs';
 
 const { values } = parseArgs({
+  args: cliArgs(),
   options: {
     map: { type: 'string' },
     captures: { type: 'string' },
@@ -31,6 +33,7 @@ const { values } = parseArgs({
     quality: { type: 'string' },
     'max-kb': { type: 'string' },
     'min-quality': { type: 'string' },
+    effort: { type: 'string' },
     webp: { type: 'boolean' },
     date: { type: 'string' },
     build: { type: 'string' },
@@ -45,6 +48,14 @@ if (!values.map || !/^de_[a-z0-9]+$/.test(values.map)) {
 }
 if (values.date && !/^\d{4}-\d{2}-\d{2}$/.test(values.date)) {
   console.error('--date must look like 2026-11-02');
+  process.exit(2);
+}
+
+// A number that is not one would reach the encoder as NaN and fail with a message about sharp, not about the flag.
+const RANGES = { quality: [1, 100], 'min-quality': [1, 100], 'max-kb': [1, 100000], effort: [0, 9] };
+const badFlags = Object.entries(RANGES).filter(([name, [lo, hi]]) => values[name] !== undefined && !(Number.isInteger(Number(values[name])) && Number(values[name]) >= lo && Number(values[name]) <= hi));
+if (badFlags.length > 0) {
+  for (const [name, [lo, hi]] of badFlags) console.error(`--${name} must be a whole number from ${lo} to ${hi}, not "${values[name]}"`);
   process.exit(2);
 }
 
@@ -65,6 +76,7 @@ const job = {
   ...number('quality'),
   ...number('max-kb'),
   ...number('min-quality'),
+  ...number('effort'),
   log: (line) => console.log(line),
 };
 

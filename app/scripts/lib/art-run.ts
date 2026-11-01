@@ -30,6 +30,8 @@ export interface ArtJob {
   tolerance?: number;
   /** Size budget for one map's file in bytes; the tolerance grows until it fits. Default 150,000. */
   budget?: number;
+  /** Warn when less of the art than this lies on the radar. Default `MIN_ON_RADAR`. */
+  minOnRadar?: number;
   log?: (line: string) => void;
 }
 
@@ -60,6 +62,10 @@ export interface MapReport {
   tolerance: number;
   written: boolean;
   levels: Record<string, LevelArt & { overlap?: Overlap }>;
+  /** Still bigger than the budget after the tolerance was raised as far as this tries. */
+  overBudget: boolean;
+  /** Things worth a look that do not stop the file being written. */
+  warnings: string[];
   seconds: number;
 }
 
@@ -102,10 +108,17 @@ export function loadMapSource(id: string, dataDir: string, assetsDir: string): M
   };
 }
 
-/** Valve's radar for a level: `de_nuke.png` for the first, `de_nuke_lower.png` for the others. */
-export function radarFile(assetsDir: string, mapId: string, levelId: string, first: boolean): string {
-  return path.join(assetsDir, 'radars', first ? `${mapId}.png` : `${mapId}_${levelId}.png`);
+/** Valve's radar for a level, named as content-tools/spike/radar.py writes it: `de_nuke.png` for `default`, `de_nuke_lower.png` for `lower`. */
+export function radarFile(assetsDir: string, mapId: string, levelId: string): string {
+  return path.join(assetsDir, 'radars', levelId === 'default' ? `${mapId}.png` : `${mapId}_${levelId}.png`);
 }
+
+/**
+ * Below this share of the art lying on the radar's solid pixels, `runArt` warns that the projection or the radar is
+ * probably wrong. A guess, not a measured limit: with the right projection the share should be close to 1, but the
+ * numbers on Dan's real data are not known yet (this was developed on synthetic meshes).
+ */
+export const MIN_ON_RADAR = 0.7
 
 /** How well the silhouette matches the walkable pixels of the radar (alpha of at least half), both at `size` px square. */
 export async function compareWithRadar(pathD: string, radarPng: string, size: number): Promise<Overlap> {
@@ -136,6 +149,8 @@ export async function makeMapArt(source: MapSource, mesh: unknown, job: ArtJob):
   const budget = job.budget ?? 150_000;
   let tolerance = job.tolerance ?? 1;
   let levels = buildArt(parsed, source.projection, source.levels, { tolerance });
+  // An art file with no level would load as "unusable" in the app; better to fail here and leave any earlier file alone.
+  if (Object.keys(levels).length === 0) throw new Error('the nav mesh has no walkable area to draw (no areas, or none larger than a speck)');
   let text = '';
   for (let attempt = 0; ; attempt++) {
     text = stableJson({ map: source.id, gameBuild: source.gameBuild, levels: Object.fromEntries(Object.entries(levels).map(([id, l]) => [id, l.path])) });
@@ -155,18 +170,20 @@ export async function makeMapArt(source: MapSource, mesh: unknown, job: ArtJob):
   }
 
   const withOverlap: MapReport['levels'] = {};
-  let first = true;
+  const warnings: string[] = [];
   for (const level of source.levels) {
     const art = levels[level.id];
-    if (!art) {
-      first = false;
-      continue;
+    if (!art) continue;
+    const radar = radarFile(job.assetsDir, source.id, level.id);
+    const overlap = job.check !== false && existsSync(radar) ? await compareWithRadar(art.path, radar, source.radarSize) : undefined;
+    withOverlap[level.id] = overlap ? { ...art, overlap } : art;
+    if (overlap && 1 - overlap.stray < (job.minOnRadar ?? MIN_ON_RADAR)) {
+      warnings.push(`${source.id} ${level.id}: only ${((1 - overlap.stray) * 100).toFixed(0)}% of the art lies on the radar; check the projection (${source.from}) and that the radar is this level's`);
     }
-    const radar = radarFile(job.assetsDir, source.id, level.id, first);
-    withOverlap[level.id] = job.check !== false && existsSync(radar) ? { ...art, overlap: await compareWithRadar(art.path, radar, source.radarSize) } : art;
-    first = false;
   }
-  return { id: source.id, from: source.from, file, bytes: Buffer.byteLength(text), tolerance, written: !unchanged, levels: withOverlap, seconds: (performance.now() - t0) / 1000 };
+  const bytes = Buffer.byteLength(text);
+  if (bytes > budget) warnings.push(`${source.id}: ${kb(bytes)} is over the ${kb(budget)} budget even at a tolerance of ${tolerance} px; the app still works, but the file is big`);
+  return { id: source.id, from: source.from, file, bytes, tolerance, written: !unchanged, levels: withOverlap, overBudget: bytes > budget, warnings, seconds: (performance.now() - t0) / 1000 };
 }
 
 /** The ids of the maps that have a nav mesh in the assets folder. */
@@ -175,35 +192,37 @@ export function mapsWithNav(assetsDir: string): string[] {
   return existsSync(dir) ? readdirSync(dir).filter((f) => /^de_[a-z0-9]+\.json$/.test(f)).map((f) => f.slice(0, -5)).sort() : [];
 }
 
-export async function runArt(job: ArtJob): Promise<{ reports: MapReport[]; problems: string[] }> {
+export async function runArt(job: ArtJob): Promise<{ reports: MapReport[]; problems: string[]; warnings: string[] }> {
   const say = job.log ?? (() => {});
   const available = mapsWithNav(job.assetsDir);
   const wanted = job.maps && job.maps.length > 0 ? [...job.maps] : available;
   const reports: MapReport[] = [];
   const problems: string[] = [];
+  const warnings: string[] = [];
   for (const id of wanted) {
     if (!available.includes(id)) {
       problems.push(`${id}: no nav mesh at ${path.join(job.assetsDir, 'nav', `${id}.json`)}`);
       continue;
     }
-    const source = loadMapSource(id, job.dataDir, job.assetsDir);
-    if (!source) {
-      problems.push(`${id}: no projection (not in data/maps and not in overviews/overviews.json)`);
-      continue;
-    }
     try {
+      const source = loadMapSource(id, job.dataDir, job.assetsDir);
+      if (!source) {
+        problems.push(`${id}: no projection (not in data/maps and not in overviews/overviews.json)`);
+        continue;
+      }
       const report = await makeMapArt(source, readJson(path.join(job.assetsDir, 'nav', `${id}.json`)), job);
       reports.push(report);
+      warnings.push(...report.warnings);
       for (const [levelId, l] of Object.entries(report.levels)) {
         const o = l.overlap;
         say(
           `${id.padEnd(12)} ${levelId.padEnd(8)} ${String(l.loops).padStart(4)} loops ${String(l.points).padStart(6)} corners  ${o ? `${((1 - o.stray) * 100).toFixed(1)}% of the art is on the radar, which it fills ${(o.covered * 100).toFixed(1)}% of` : 'no radar to compare'}`,
         );
       }
-      say(`${' '.repeat(12)} ${path.relative(process.cwd(), report.file) || report.file}: ${kb(report.bytes)}, tolerance ${report.tolerance} px, ${report.written ? 'written' : 'unchanged'}, ${report.seconds.toFixed(1)} s (projection from ${report.from})`);
+      say(`${' '.repeat(12)} ${path.relative(process.cwd(), report.file) || report.file}: ${kb(report.bytes)}, tolerance ${report.tolerance} px, ${report.written ? 'written' : 'unchanged'}, ${report.seconds.toFixed(1)} s (projection from ${report.from})${report.overBudget ? `  OVER THE ${kb(job.budget ?? 150_000)} BUDGET` : ''}`);
     } catch (e) {
       problems.push(`${id}: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
-  return { reports, problems };
+  return { reports, problems, warnings };
 }

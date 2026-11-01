@@ -36,11 +36,22 @@ const shotUrl = (file: string) => `${import.meta.env.BASE_URL}shots/${file}`;
 
 let cache: Promise<MapData[]> | null = null;
 
-/** The silhouette of a map, or nothing when it has not been generated or does not fit the map (the map still works). */
-async function loadArt(map: MapRecord): Promise<Pick<MapData, 'art' | 'artLevels'>> {
-  const load = artFiles[`../../../data/art/${map.id}.json`];
+/**
+ * The silhouette of a map from the loaders `import.meta.glob` gives for data/art (keyed by their path), or nothing when
+ * it has not been generated or does not fit the map: the map still works without it. Exported so a test can pass
+ * loaders of its own, because the real folder is generated, gitignored and empty on a fresh checkout.
+ */
+export async function loadMapArt(files: Readonly<Record<string, () => Promise<unknown>>>, map: MapRecord): Promise<Pick<MapData, 'art' | 'artLevels'>> {
+  const load = files[`../../../data/art/${map.id}.json`];
   if (!load) return { art: null };
-  const parsed = ArtFileSchema.safeParse(await load());
+  let raw: unknown;
+  try {
+    raw = await load();
+  } catch (e) {
+    console.warn(`data/art/${map.id}.json could not be loaded (${e instanceof Error ? e.message : String(e)}); run pnpm content:art`);
+    return { art: null };
+  }
+  const parsed = ArtFileSchema.safeParse(raw);
   const art = parsed.success ? firstLevelArt(parsed.data, map) : null;
   if (!parsed.success || art === null) {
     console.warn(`data/art/${map.id}.json is not usable (${parsed.success ? 'wrong map or no levels' : parsed.error.issues[0]?.message}); run pnpm content:art`);
@@ -61,7 +72,7 @@ async function load(): Promise<MapData[]> {
       const first = parsed.issues.find((i) => i.severity === 'error');
       throw new Error(`${entry.id} data is not valid${first ? `: ${first.message}` : ''}`);
     }
-    out.push({ map: parsed.map, callouts: parsed.callouts, shotUrl, demo: false, ...(await loadArt(parsed.map)) });
+    out.push({ map: parsed.map, callouts: parsed.callouts, shotUrl, demo: false, ...(await loadMapArt(artFiles, parsed.map)) });
   }
   // The condition is written out here, not in a helper, so the bundler can see it is false and drop the import.
   if (import.meta.env.DEV || import.meta.env.VITE_DEMO === '1') {
