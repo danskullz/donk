@@ -16,5 +16,5 @@
     "resolveJsonModule": true,
     "noEmit": true
   },
-  "include": ["src/**/*.ts", "src/**/*.svelte", "vite.config.ts", "playwright.config.ts", "playwright.editor.config.ts", "tools/**/*.ts", "scripts/**/*.d.mts", "e2e/**/*.ts", "e2e-editor/**/*.ts"]
+  "include": ["src/**/*.ts", "src/**/*.svelte", "vite.config.ts", "playwright.config.ts", "playwright.editor.config.ts", "tools/**/*.ts", "scripts/**/*.ts", "scripts/**/*.d.mts", "e2e/**/*.ts", "e2e-editor/**/*.ts"]
 }

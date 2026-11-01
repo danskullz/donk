@@ -34,6 +34,8 @@ export interface ProcessJob {
   /** Re-encode at lower quality until a file is no bigger than this, down to `minQuality`. Default 90 KB. */
   maxKb?: number;
   minQuality?: number;
+  /** AVIF encoder effort, 0 (fast, larger) to 9 (slow, smaller). Default 4. */
+  effort?: number;
   /** Also write <name>.webp beside each AVIF. */
   webp?: boolean;
   /** `captured` for every entry (YYYY-MM-DD). Default: the date of the capture file. */
@@ -56,13 +58,13 @@ const KEEP_BACKUPS = 30;
 const kb = (bytes: number) => `${(bytes / 1024).toFixed(1)} KB`;
 
 /** One PNG to a 1280x720 AVIF, lowering the quality if the first try is over the size budget. */
-export async function encodeAvif(png: string, o: { quality: number; maxBytes: number; minQuality: number }): Promise<{ data: Buffer; quality: number }> {
+export async function encodeAvif(png: string, o: { quality: number; maxBytes: number; minQuality: number; effort?: number }): Promise<{ data: Buffer; quality: number }> {
   const meta = await sharp(png).metadata();
   if (!meta.width || !meta.height) throw new Error('not an image');
   if (Math.abs(meta.width / meta.height - FRAME.width / FRAME.height) > 0.01) throw new Error(`${meta.width}x${meta.height} is not 16:9`);
   let quality = o.quality;
   for (;;) {
-    const data = await sharp(png).resize(FRAME.width, FRAME.height, { fit: 'cover' }).avif({ quality, effort: 4 }).toBuffer();
+    const data = await sharp(png).resize(FRAME.width, FRAME.height, { fit: 'cover' }).avif({ quality, effort: o.effort ?? 4 }).toBuffer();
     if (data.length <= o.maxBytes || quality <= o.minQuality) return { data, quality };
     quality = Math.max(o.minQuality, quality - 5);
   }
@@ -127,7 +129,7 @@ export async function processShots(job: ProcessJob): Promise<ProcessReport> {
   const wanted = have.map((h) => ({ calloutId: h.plan.calloutId, entry: fullEntry(h.plan, h.captured, build) }));
   const first = mergeShots(callouts, wanted, job.force === true);
   const quality = job.quality ?? 60;
-  const options = { quality, maxBytes: (job.maxKb ?? 90) * 1024, minQuality: job.minQuality ?? 40 };
+  const options = { quality, maxBytes: (job.maxKb ?? 90) * 1024, minQuality: job.minQuality ?? 40, effort: job.effort ?? 4 };
   const failed = new Set<string>();
 
   for (const row of first.rows) {

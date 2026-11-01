@@ -19,6 +19,15 @@ export function folders() {
   };
 }
 
+/**
+ * The command-line arguments after the script name, minus one leading `--`. `pnpm content:process -- --map x` hands
+ * that `--` on to the script, and Node's parseArgs reads everything after it as positional, so without this the
+ * documented form fails. Both `pnpm content:process --map x` and `pnpm content:process -- --map x` work.
+ */
+export function cliArgs(argv = process.argv.slice(2)) {
+  return argv[0] === '--' ? argv.slice(1) : argv;
+}
+
 export function startCore() {
   return createServer({
     root: appRoot,

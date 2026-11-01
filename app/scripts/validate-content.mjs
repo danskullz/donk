@@ -1,15 +1,17 @@
 // `pnpm content:validate`: checks everything under /data (SCOPE.md §7.7) with the same schemas and rules the
 // app uses. Exits 1 on any error, or on any warning with --strict. Run it before committing content.
 //
-// Also checks the generated files when they exist: every screenshot a callout lists is in assets/shots (and files there
-// that no callout lists are reported), and each map's art (data/art/<map>.json, `pnpm content:art`) is valid, current
-// and inside the radar. The folders can be moved with CALLOUTS_DATA_DIR, CALLOUTS_SHOTS_DIR and CALLOUTS_ART_DIR.
+// Also checks the generated files when they exist: every screenshot a callout lists is in assets/shots and is a readable
+// 1280x720 image (files there that no callout lists are reported), and each map's art (data/art/<map>.json,
+// `pnpm content:art`) is valid, current and inside the radar. The folders can be moved with CALLOUTS_DATA_DIR,
+// CALLOUTS_SHOTS_DIR and CALLOUTS_ART_DIR.
 //
 // The core is TypeScript, so it is loaded through Vite's module runner rather than compiled first.
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import sharp from 'sharp';
 import { createServer } from 'vite';
 
 const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -18,6 +20,7 @@ const shotsDir = path.resolve(process.env.CALLOUTS_SHOTS_DIR ?? path.join(appRoo
 const artDir = path.resolve(process.env.CALLOUTS_ART_DIR ?? path.join(dataDir, 'art'));
 const strict = process.argv.includes('--strict');
 const ART_BUDGET = 150 * 1024;
+const SHOT_SIZE = { width: 1280, height: 720 };
 
 const readJson = (file) => JSON.parse(readFileSync(file, 'utf8'));
 
@@ -55,10 +58,12 @@ try {
   const { pathBounds } = await server.ssrLoadModule('/scripts/lib/art.ts');
 
   /** Art is optional (the app draws without it), so a map with none is only listed; one that exists must be sound. */
-  const checkArt = (id, map) => {
+  const checked = new Set();
+  const checkArt = (id, map, quiet = false) => {
+    checked.add(id);
     const file = path.join(artDir, `${id}.json`);
     if (!existsSync(file)) {
-      say('  art: none (pnpm content:art makes it)');
+      if (!quiet) say('  art: none (pnpm content:art makes it)');
       return;
     }
     let raw;
@@ -77,7 +82,7 @@ try {
     const art = parsed.data;
     const size = statSync(file).size;
     const levels = Object.keys(art.levels);
-    say(`  art: ${levels.length} level${levels.length === 1 ? '' : 's'}, ${(size / 1024).toFixed(1)} KB`);
+    if (!quiet) say(`  art: ${levels.length} level${levels.length === 1 ? '' : 's'}, ${(size / 1024).toFixed(1)} KB`);
     if (art.map !== id) report('error', 'art-map', '', `art/${id}.json is for ${art.map}`);
     if (size > ART_BUDGET) report('warning', 'art-size', '', `art/${id}.json is ${(size / 1024).toFixed(0)} KB, over the ${ART_BUDGET / 1024} KB budget`);
     if (!map) return;
@@ -141,13 +146,26 @@ try {
       const listed = parsed.callouts.flatMap((c) => c.shots.map((s) => ({ callout: c.id, file: s.file })));
       if (haveShots) {
         let present = 0;
+        let bytes = 0;
         for (const { callout, file } of listed) {
-          if (existsSync(path.join(shotsDir, file))) present += 1;
-          else report('error', 'shot-file', callout, `${file} is not in assets/shots`);
+          const full = path.join(shotsDir, file);
+          if (!existsSync(full)) {
+            report('error', 'shot-file', callout, `${file} is not in assets/shots`);
+            continue;
+          }
+          present += 1;
+          bytes += statSync(full).size;
+          // a header read, not a decode: enough to catch an empty, truncated or mislabelled file, which the app would show as a broken picture
+          try {
+            const meta = await sharp(full).metadata();
+            if (meta.width !== SHOT_SIZE.width || meta.height !== SHOT_SIZE.height) report('warning', 'shot-size', callout, `${file} is ${meta.width}x${meta.height}, not ${SHOT_SIZE.width}x${SHOT_SIZE.height}`);
+          } catch {
+            report('error', 'shot-unreadable', callout, `${file} is not a readable image`);
+          }
         }
         const folder = path.join(shotsDir, mapSlug(entry.id));
         const files = existsSync(folder) ? readdirSync(folder).filter((f) => /\.(avif|webp|png)$/.test(f)) : [];
-        say(`  shots: ${listed.length} listed, ${present} on disk${files.length ? `, ${files.length} files in assets/shots/${mapSlug(entry.id)}` : ''}`);
+        say(`  shots: ${listed.length} listed, ${present} on disk${present ? ` (${(bytes / 1024).toFixed(0)} KB, ${(bytes / present / 1024).toFixed(0)} KB each)` : ''}${files.length ? `, ${files.length} files in assets/shots/${mapSlug(entry.id)}` : ''}`);
         // a .webp or .png beside an .avif is its fallback, not a stray
         const wanted = new Set(listed.map((l) => l.file.replace(/\.(avif|webp|png)$/, '')));
         for (const f of files) {
@@ -159,11 +177,18 @@ try {
     checkArt(entry.id, parsed.map);
   }
 
-  // Art is generated, so every map is listed with whether it has any, available or not.
+  // Art is generated, so every map is listed with whether it has any, available or not. A map without a record (art
+  // made from the extracted overview file alone) still gets its file checked, as far as the file can say.
   say('\nmap art (data/art, from pnpm content:art)');
   for (const entry of index) {
     const file = path.join(artDir, `${entry.id}.json`);
     say(`  ${entry.id.padEnd(12)} ${existsSync(file) ? artSummary(file) : 'none'}`);
+    if (existsSync(file) && !checked.has(entry.id)) checkArt(entry.id, null, true);
+  }
+  if (existsSync(artDir)) {
+    for (const f of readdirSync(artDir).filter((name) => name.endsWith('.json'))) {
+      if (!index.some((m) => `${m.id}.json` === f)) report('warning', 'art-orphan', '', `art/${f} is for a map that index.json does not list`);
+    }
   }
 } catch (e) {
   errors += 1;
