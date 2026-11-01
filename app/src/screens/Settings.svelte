@@ -109,57 +109,60 @@
 <div class="app settings">
   <header class="bar" inert={confirm !== null}>
     <a class="brand" href="#/" aria-label="callouts, back to the start">callouts</a>
-    <span class="crumb st-hide-s"><b>Settings</b></span>
+    <span class="crumb set-hide-s"><b>Settings</b></span>
     <span class="grow"></span>
     <button class="btn" type="button" onclick={resetAll}>Reset settings</button>
-    <a class="btn primary" href="#/">Done <kbd class="st-hide-s">esc</kbd></a>
+    <a class="btn primary" href="#/">Done <kbd class="set-hide-s">esc</kbd></a>
   </header>
 
   <h1 class="sr-only">Settings</h1>
 
-  <div class="st-tabs" inert={confirm !== null}>
+  <div class="set-tabs" inert={confirm !== null}>
     <div class="tabs" role="tablist" aria-label="Settings" tabindex="-1" onkeydown={onTabKey}>
       {#each TABS as id (id)}
         <button
           class="tab"
           type="button"
           role="tab"
-          id="st-tab-{id}"
+          id="set-tab-{id}"
           aria-selected={tab === id}
-          aria-controls="st-panel"
+          aria-controls="set-panel"
           tabindex={tab === id ? 0 : -1}
           bind:this={tabButtons[id]}
           onclick={() => select(id)}
         >
-          {LABELS[id].text}{#if LABELS[id].more}<span class="st-hide-s">{LABELS[id].more}</span>{/if}
+          {LABELS[id].text}{#if LABELS[id].more}<span class="set-hide-s">{LABELS[id].more}</span>{/if}
         </button>
       {/each}
     </div>
   </div>
 
-  <main class="st-body" id="st-panel" role="tabpanel" aria-labelledby="st-tab-{tab}" inert={confirm !== null}>
-    {#if tab === 'session'}
-      <SessionTab {settings} />
-    {:else if tab === 'hard'}
-      <HardTab {settings} />
-    {:else if tab === 'naming'}
-      <NamingTab {settings} />
-    {:else if tab === 'display'}
-      <DisplayTab {settings} />
-    {:else if tab === 'keys'}
-      <KeysTab />
-    {:else}
-      <DataTab {part} onpart={choosePart} ask={(spec) => void ask(spec)} {log} />
-    {/if}
+  <main class="set-body" inert={confirm !== null}>
+    <!-- the panel is a div inside <main>: a tabpanel is an interactive role and <main> may not carry one -->
+    <div class="set-tabpanel" id="set-panel" role="tabpanel" aria-labelledby="set-tab-{tab}">
+      {#if tab === 'session'}
+        <SessionTab {settings} />
+      {:else if tab === 'hard'}
+        <HardTab {settings} />
+      {:else if tab === 'naming'}
+        <NamingTab {settings} />
+      {:else if tab === 'display'}
+        <DisplayTab {settings} />
+      {:else if tab === 'keys'}
+        <KeysTab />
+      {:else}
+        <DataTab {part} onpart={choosePart} ask={(spec) => void ask(spec)} {log} />
+      {/if}
+    </div>
   </main>
 
   {#if confirm}
-    <div class="st-confirm" role="alertdialog" aria-labelledby="st-confirm-title" aria-describedby="st-confirm-body">
-      <h2 id="st-confirm-title">{confirm.title}</h2>
-      <p id="st-confirm-body" class="st-help">{confirm.body}</p>
-      <div class="st-actions">
+    <div class="set-confirm" role="alertdialog" aria-labelledby="set-confirm-title" aria-describedby="set-confirm-body">
+      <h2 id="set-confirm-title">{confirm.title}</h2>
+      <p id="set-confirm-body" class="set-help">{confirm.body}</p>
+      <div class="set-actions">
         <button class="btn" type="button" bind:this={cancelButton} onclick={close}>{confirm.cancel}</button>
-        <button class="btn st-danger" type="button" disabled={working} onclick={confirmed}>{confirm.action}</button>
+        <button class="btn set-danger" type="button" disabled={working} onclick={confirmed}>{confirm.action}</button>
       </div>
     </div>
   {/if}

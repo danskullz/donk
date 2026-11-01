@@ -34,6 +34,7 @@ export const KEYMAP: readonly KeyGroup[] = [
     id: 'map',
     title: 'On a map',
     rows: [
+      { keys: ['←', '→', '↑', '↓'], does: 'Move between regions' },
       { keys: ['+', '-'], does: 'Zoom in, zoom out' },
       { keys: ['0'], does: 'Fit the whole map' },
       { keys: ['Tab', 'Enter'], does: 'Choose a region' },

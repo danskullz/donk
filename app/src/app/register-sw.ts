@@ -9,7 +9,7 @@
 
 /** A short, plain id (lowercase letters and digits, as the worker's cache names need) from the build files' names. */
 export function buildIdFrom(urls: readonly string[]): string {
-  const names = urls
+  const paths = urls
     .map((u) => {
       try {
         return new URL(u, 'http://x/').pathname;
@@ -17,8 +17,9 @@ export function buildIdFrom(urls: readonly string[]): string {
         return u;
       }
     })
-    .filter((p) => p.includes('/assets/'))
-    .sort();
+    .filter((p) => p.includes('/assets/'));
+  // Each file once: the same file named by a script tag and a preload link is still one file of the build.
+  const names = [...new Set(paths)].sort();
   if (names.length === 0) return 'dev';
   // FNV-1a over the joined names; two 32-bit passes with different seeds give 12 characters, ample for a handful of builds
   let a = 0x811c9dc5;
@@ -46,9 +47,14 @@ function pageAssetUrls(): string[] {
   return [...nodes].map((n) => ('src' in n && n.src ? n.src : (n as HTMLLinkElement).href));
 }
 
+// Read when this file first runs, which is before the app has opened any screen: later, Vite adds a link for the style
+// sheet of each lazy chunk it loads, and an id that depended on which screens were visited would change from visit to
+// visit and install a new worker every time.
+const entryAssets = typeof document === 'undefined' ? [] : pageAssetUrls();
+
 async function register(): Promise<void> {
   const base = import.meta.env.BASE_URL;
-  const build = buildIdFrom(pageAssetUrls());
+  const build = buildIdFrom(entryAssets);
   const registration = await navigator.serviceWorker.register(`${base}sw.js?build=${build}`, { scope: base, updateViaCache: 'none' });
 
   // The first visit loads every file before the worker controls the page, so tell it what was loaded (it keeps the

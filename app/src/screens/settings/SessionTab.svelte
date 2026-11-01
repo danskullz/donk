@@ -22,27 +22,27 @@
   );
 </script>
 
-<div class="st-panel">
-  <div class="st-col">
-    <section class="st-block">
+<div class="set-panel">
+  <div class="set-col">
+    <section class="set-block">
       <h2>Session length</h2>
       <Segmented label="Session length" options={lengths} value={length} onchoose={chooseLength} />
-      <p class="st-help">
+      <p class={length === null ? 'set-status' : 'set-help'}>
         {#if length === null}Now set to {custom}, which is not one of these. Pick one to replace it.{:else}A session ends at this limit or when nothing more is due. <kbd>Esc</kbd> ends it at any time; everything answered is saved.{/if}
       </p>
     </section>
 
-    <section class="st-block">
+    <section class="set-block">
       <h2>New callouts per session</h2>
       <Segmented label="New callouts per session" options={counts} value={String(settings.newPerSession)} columns={8} onchoose={(v) => updateSettings({ newPerSession: Number(v) })} />
-      <p class="st-help">How many callouts one session may introduce. Fewer is gentler. While many reviews are due, no new ones come at all.</p>
+      <p class="set-help">How many callouts one session may introduce. Fewer is gentler. While many reviews are due, no new ones come at all.</p>
     </section>
   </div>
 
-  <div class="st-col">
-    <section class="st-block">
+  <div class="set-col">
+    <section class="set-block">
       <h2>How much to remember</h2>
-      <div class="st-range">
+      <div class="set-range">
         <input
           type="range"
           min="85"
@@ -55,14 +55,14 @@
         />
         <output class="nums" aria-hidden="true">{percent}%</output>
       </div>
-      <div class="st-range-ends sub"><span>fewer reviews</span><span>fewer misses</span></div>
-      <p class="st-help">At {percent}% you should get about {inTen} in 10 right when a card comes back. Higher: cards return sooner, so more reviews. Lower: fewer reviews, more misses.</p>
+      <div class="set-range-ends sub"><span>fewer reviews</span><span>fewer misses</span></div>
+      <p class="set-help">At {percent}% you should get about {inTen} in 10 right when a card comes back. Higher: cards return sooner, so more reviews. Lower: fewer reviews, more misses.</p>
     </section>
 
-    <section class="st-block">
+    <section class="set-block">
       <h2>Gentle start</h2>
       <Switch label="Three choices at first" checked={settings.gentleStart} onchange={(on) => updateSettings({ gentleStart: on })} />
-      <p class="st-help">A new callout's first multiple-choice question has three answers instead of four.</p>
+      <p class="set-help">A new callout's first multiple-choice question has three answers instead of four.</p>
     </section>
   </div>
 </div>

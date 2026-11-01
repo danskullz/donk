@@ -4,6 +4,7 @@
   // the screen and the sentences.
 
   import { loadAvailableMaps } from '../../app/data';
+  import { clearLastSession, getLastSession } from '../../app/last-session';
   import {
     cacheMapPack,
     formatBytes,
@@ -23,10 +24,12 @@
     calloutPrefix,
     countEventsForMap,
     exportFileName,
+    importCounts,
     MAX_IMPORT_BYTES,
     mergeEvents,
     parseImport,
     serializeExport,
+    type ImportCounts,
     type MergeResult,
   } from '../../core/exportfile';
   import type { ReviewEvent } from '../../core/log';
@@ -53,9 +56,7 @@
     fileName: string;
     exportedAt: string | null;
     merge: MergeResult;
-    invalid: number;
-    /** Valid rows that repeat an id earlier in the same file, counted with the ones already here. */
-    repeated: number;
+    counts: ImportCounts;
     settings: { patch: Partial<AppSettings>; rejected: string[] } | null;
   }
 
@@ -123,7 +124,7 @@
       }
       const merge = mergeEvents((await readEvents(log.name)).events, parsed.events);
       const settings = parsed.settings ? settingsFromBackup(parsed.settings) : null;
-      preview = { fileName: file.name, exportedAt: parsed.exportedAt, merge, invalid: parsed.invalid, repeated: parsed.repeated, settings };
+      preview = { fileName: file.name, exportedAt: parsed.exportedAt, merge, counts: importCounts(parsed, merge), settings };
       useSettings = false;
     } catch (err) {
       importError = `That file could not be read: ${err instanceof Error ? err.message : 'unknown error'}.`;
@@ -140,7 +141,8 @@
       const written = await addEventsIfNew(p.merge.added, log.name);
       const took = useSettings && p.settings && Object.keys(p.settings.patch).length > 0;
       if (took && p.settings) updateSettings(p.settings.patch);
-      importNote = `Added ${plural(written, 'event')}${took ? ' and the settings from the file' : ''}. Everything else was already here.`;
+      const rest = [p.counts.alreadyHere > 0 ? `${p.counts.alreadyHere} already here` : '', p.counts.invalid > 0 ? `${p.counts.invalid} invalid, left out` : ''].filter(Boolean);
+      importNote = `Added ${plural(written, 'event')}${took ? ' and the settings from the file' : ''}${rest.length > 0 ? `. ${rest.join(', ')}` : ''}.`;
       preview = null;
       await Promise.all([refreshTotal(), loadRows()]);
     } catch (err) {
@@ -192,6 +194,9 @@
       run: async () => {
         try {
           const removed = await deleteEventsForMap(calloutPrefix(row.id), logDbName(row.demo));
+          // The summary of the session just played is kept in memory for the Summary screen: after a reset it would
+          // show numbers for answers that no longer exist.
+          if (getLastSession(row.id)) clearLastSession();
           resetNote = `Deleted ${plural(removed, 'event')} for ${row.name}.`;
         } catch (err) {
           resetNote = `Could not reset ${row.name}: ${err instanceof Error ? err.message : 'unknown error'}.`;
@@ -284,38 +289,41 @@
   const previewHasSettings = $derived(preview?.settings !== null && preview?.settings !== undefined && Object.keys(preview.settings.patch).length > 0);
 </script>
 
-<div class="st-data">
+<div class="set-data">
   <Segmented label="Data section" options={parts} value={part} onchoose={(v) => onpart(v as PartId)} />
 
   {#if part === 'backup'}
-    <div class="st-panel">
-      <div class="st-col">
-        <section class="st-block">
+    <div class="set-panel">
+      <div class="set-col">
+        <section class="set-block">
           <h2>Export</h2>
-          <p class="st-help">One file with every answer you have given and your settings. Keep a copy somewhere safe.{#if log.demo} <span class="chip warn">development log</span>{/if}</p>
-          <div class="st-actions">
+          <p class="set-help">One file with every answer you have given and your settings. Keep a copy somewhere safe.</p>
+          <div class="set-actions">
             <button class="btn primary" type="button" disabled={busy} onclick={doExport}>Download backup</button>
-            <span class="sub nums">{total === null ? '' : plural(total, 'event')}</span>
+            <span class="sub nums" data-testid="log-count">{total === null ? '' : plural(total, 'event')}</span>
+            {#if log.demo}<span class="chip warn">development log</span>{/if}
           </div>
-          <p class="st-note" role="status">{exportNote}</p>
+          <p class="set-note" role="status">{exportNote}</p>
         </section>
       </div>
 
-      <div class="st-col">
-        <section class="st-block">
+      <div class="set-col">
+        <section class="set-block">
           <h2>Import</h2>
           {#if preview}
-            <div class="st-preview" role="status">
-              <p class="st-counts nums">
-                <span><b>{plural(preview.merge.added.length, 'new event')}</b>,</span>
-                <span>{preview.merge.alreadyHere + preview.repeated} already here,</span>
-                <span>{preview.invalid} invalid</span>
+            <div class="set-preview" role="status">
+              <p class="set-counts nums">
+                <span><b>{preview.counts.added} new</b>,</span>
+                <span>{preview.counts.alreadyHere} already here,</span>
+                <span>{preview.counts.invalid} invalid</span>
               </p>
-              <p class="sub st-help">{preview.fileName}{preview.exportedAt ? `, made ${when(Date.parse(preview.exportedAt))}` : ''}{preview.merge.conflicts > 0 ? `. ${plural(preview.merge.conflicts, 'event differs', 'events differ')} from yours; yours are kept` : ''}.</p>
+              <p class="sub set-help">
+                Events in {preview.fileName}{preview.exportedAt ? `, made ${when(Date.parse(preview.exportedAt))}` : ''}{preview.counts.conflicts > 0 ? `. ${plural(preview.counts.conflicts, 'event differs', 'events differ')} from yours; yours are kept` : ''}{preview.settings && preview.settings.rejected.length > 0 ? `. ${plural(preview.settings.rejected.length, 'setting')} in the file could not be used and will be ignored` : ''}.
+              </p>
               {#if previewHasSettings}
                 <Switch label="Also use its settings" checked={useSettings} onchange={(on) => (useSettings = on)} />
               {/if}
-              <div class="st-actions">
+              <div class="set-actions">
                 <button class="btn primary" type="button" disabled={busy || preview.merge.added.length === 0} onclick={doMerge}>
                   {preview.merge.added.length === 0 ? 'Nothing new' : `Merge ${plural(preview.merge.added.length, 'event')}`}
                 </button>
@@ -323,48 +331,48 @@
               </div>
             </div>
           {:else}
-            <p class="st-help">Merge a backup file into this browser. Nothing is overwritten, and events you already have are skipped, so it is safe to repeat.</p>
-            <div class="st-actions">
+            <p class="set-help">Merge a backup file into this browser. Nothing is overwritten, and events you already have are skipped, so it is safe to repeat.</p>
+            <div class="set-actions">
               <button class="btn" type="button" disabled={busy} onclick={() => fileInput?.click()}>Choose a backup file</button>
               <input bind:this={fileInput} class="sr-only" type="file" accept=".json,application/json" tabindex="-1" aria-label="Backup file" onchange={onFile} />
             </div>
           {/if}
-          {#if importError}<p class="st-note st-error" role="alert">{importError}</p>{/if}
-          {#if importNote}<p class="st-note" role="status">{importNote}</p>{/if}
+          {#if importError}<p class="set-note set-error" role="alert">{importError}</p>{/if}
+          {#if importNote}<p class="set-note" role="status">{importNote}</p>{/if}
         </section>
       </div>
     </div>
   {:else if part === 'progress'}
-    <div class="st-panel st-one">
-      <section class="st-block">
+    <div class="set-panel set-one">
+      <section class="set-block">
         <h2>Reset progress for one map</h2>
-        <p class="st-help">Deletes that map's answers and intro cards from this browser. Other maps and your settings stay.</p>
-        <ul class="st-rows">
+        <p class="set-help">Deletes that map's answers and intro cards from this browser. Other maps and your settings stay.</p>
+        <ul class="set-rows">
           {#each shownRows as row (row.id)}
-            <li class="st-row">
-              <span class="st-row-main"><b>{row.name}</b> <span class="sub nums">{plural(row.count, 'event')}</span></span>
+            <li class="set-row">
+              <span class="set-row-main"><b>{row.name}</b> <span class="sub nums">{plural(row.count, 'event')}</span></span>
               <button class="btn" type="button" disabled={row.count === 0} aria-label="Reset {row.name}" onclick={() => askReset(row)}>Reset…</button>
             </li>
           {/each}
         </ul>
         {#if rows.length > PER_PAGE}
-          <div class="st-pager sub nums">
+          <div class="set-pager sub nums">
             <button class="btn" type="button" aria-label="Previous maps" disabled={rowPage === 0} onclick={() => rowPage--}>‹</button>
             <span>{rowPage + 1} / {pages(rows.length, PER_PAGE)}</span>
             <button class="btn" type="button" aria-label="Next maps" disabled={rowPage >= pages(rows.length, PER_PAGE) - 1} onclick={() => rowPage++}>›</button>
           </div>
         {/if}
-        <p class="st-note" role="status">{resetNote}</p>
+        <p class="set-note" role="status">{resetNote}</p>
       </section>
     </div>
   {:else}
-    <div class="st-panel">
-      <div class="st-col">
-        <section class="st-block">
+    <div class="set-panel">
+      <div class="set-col">
+        <section class="set-block">
           <h2>This device</h2>
-          <p class="st-help st-worker" data-state={worker ?? 'checking'}>{worker ? WORKER_TEXT[worker] : 'Checking…'}</p>
+          <p class="set-status set-worker" data-state={worker ?? 'checking'}>{worker ? WORKER_TEXT[worker] : 'Checking…'}</p>
           {#if storage}
-            <p class="st-help nums">
+            <p class="set-status nums">
               {#if storage.usage !== null && storage.quota !== null}Using {formatBytes(storage.usage)} of {formatBytes(storage.quota)}. {/if}
               {#if storage.persisted === true}The browser has promised not to clear it.{:else if storage.persisted === false}The browser may clear it if space runs low.{/if}
             </p>
@@ -372,22 +380,22 @@
         </section>
       </div>
 
-      <div class="st-col">
-        <section class="st-block">
+      <div class="set-col">
+        <section class="set-block">
           <h2>Map packs</h2>
-          <p class="st-help">Pictures for offline study. The size is known once they are downloaded.</p>
-          <ul class="st-rows">
+          <p class="set-help">Pictures for offline study. The size is known once they are downloaded.</p>
+          <ul class="set-rows">
             {#each shownPacks as t (t.mapId)}
               {@const s = statuses[t.mapId]}
-              <li class="st-row st-pack" data-map={t.mapId}>
-                <span class="st-row-main"><b>{t.name}</b> <span class="sub st-pack-status">{describe(s)}</span></span>
+              <li class="set-row set-pack" data-map={t.mapId}>
+                <span class="set-row-main"><b>{t.name}</b> <span class="sub set-pack-status">{describe(s)}</span></span>
                 {#if running?.id === t.mapId}
-                  <span class="st-row-acts">
-                    <span class="sub nums st-progress">{running.done} / {running.total}, {formatBytes(running.bytes)}</span>
+                  <span class="set-row-acts">
+                    <span class="sub nums set-progress">{running.done} / {running.total}, {formatBytes(running.bytes)}</span>
                     <button class="btn" type="button" onclick={() => running?.stop.abort()}>Stop</button>
                   </span>
                 {:else if s && s.state !== 'empty' && s.state !== 'inline'}
-                  <span class="st-row-acts">
+                  <span class="set-row-acts">
                     <button class="btn" class:primary={s.state === 'none'} type="button" disabled={running !== null} onclick={() => download(t, s.state === 'ready')}>
                       {s.state === 'none' ? 'Download for offline' : s.state === 'partial' ? 'Finish download' : 'Update'}
                     </button>
@@ -398,13 +406,13 @@
             {/each}
           </ul>
           {#if targets.length > PACKS_PER_PAGE}
-            <div class="st-pager sub nums">
+            <div class="set-pager sub nums">
               <button class="btn" type="button" aria-label="Previous maps" disabled={packPage === 0} onclick={() => packPage--}>‹</button>
               <span>{packPage + 1} / {pages(targets.length, PACKS_PER_PAGE)}</span>
               <button class="btn" type="button" aria-label="Next maps" disabled={packPage >= pages(targets.length, PACKS_PER_PAGE) - 1} onclick={() => packPage++}>›</button>
             </div>
           {/if}
-          <p class="st-note" role="status">{packNote}</p>
+          <p class="set-note" role="status">{packNote}</p>
         </section>
       </div>
     </div>

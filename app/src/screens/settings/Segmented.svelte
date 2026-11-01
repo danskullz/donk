@@ -21,9 +21,9 @@
   const group = $props.id();
 </script>
 
-<div class="st-seg" class:st-seg-grid={columns !== undefined} role="radiogroup" aria-label={label} style:--cols={columns}>
+<div class="set-seg" class:set-seg-grid={columns !== undefined} role="radiogroup" aria-label={label} style:--cols={columns}>
   {#each options as o (o.value)}
-    <label class="st-seg-opt">
+    <label class="set-seg-opt">
       <input type="radio" name={group} value={o.value} checked={value === o.value} onchange={() => onchoose(o.value)} />
       <span>{o.label}</span>
     </label>

@@ -61,6 +61,33 @@
     return 'other';
   }
 
+  /**
+   * The build files a script or style sheet names as plain strings, as absolute addresses inside the app's /assets/.
+   * The page names only the entry file; the entry names the lazy chunks (`import("./fsrs-6-HASH.js")`, and Vite's
+   * preload list writes `"assets/demo-data-HASH.js"`), and those name theirs. Following the names lets the first
+   * visit keep screens the learner has not opened yet. `./x.js` is from the file itself, `assets/x.js` from the app root.
+   */
+  function chunkRefs(text, fileUrl, scopeUrl) {
+    var scope = new URL(scopeUrl);
+    var pattern = /["'`]((?:\.{1,2}\/|\/?assets\/)[\w.@-]+(?:\/[\w.@-]+)*\.(?:js|css|woff2))["'`]/g;
+    var found = [];
+    var match;
+    while ((match = pattern.exec(text))) {
+      var ref = match[1];
+      var url;
+      try {
+        url = new URL(ref, ref.indexOf('assets/') === 0 ? scope.href : fileUrl);
+      } catch (e) {
+        continue;
+      }
+      if (url.origin !== scope.origin || url.pathname.indexOf(scope.pathname + 'assets/') !== 0) continue;
+      url.search = '';
+      url.hash = '';
+      if (found.indexOf(url.href) === -1) found.push(url.href);
+    }
+    return found;
+  }
+
   root.CalloutsCaches = {
     SHELL_PREFIX: SHELL_PREFIX,
     PACK_PREFIX: PACK_PREFIX,
@@ -71,5 +98,6 @@
     packCacheName: packCacheName,
     staleCaches: staleCaches,
     kindOf: kindOf,
+    chunkRefs: chunkRefs,
   };
 })(self);

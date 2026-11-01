@@ -61,8 +61,12 @@ function read(): AppSettings {
   try {
     const raw = storage?.getItem(SETTINGS_KEY);
     if (raw) {
-      const parsed = SettingsSchema.safeParse(JSON.parse(raw));
-      if (parsed.success) return parsed.data;
+      const parsed: unknown = JSON.parse(raw);
+      const whole = SettingsSchema.safeParse(parsed);
+      if (whole.success) return whole.data;
+      // One field that is out of range (a hand edit, a value from another version) must not reset the others.
+      const salvaged = SettingsSchema.safeParse(settingsFromBackup(parsed).patch);
+      if (salvaged.success) return salvaged.data;
     }
   } catch {
     // unreadable: fall through to the defaults
@@ -76,6 +80,15 @@ const listeners = new Set<(s: AppSettings) => void>();
 /** The value of `data-motion` on <html> for a reduced-motion setting: global.css reads it. */
 export function motionAttribute(setting: AppSettings['reducedMotion']): 'system' | 'reduce' | 'full' {
   return setting === 'on' ? 'reduce' : setting === 'off' ? 'full' : 'system';
+}
+
+/**
+ * Whether motion should be reduced right now: the learner's override if there is one, else what the device asks for.
+ * For code that animates in script (a timer drawn as a bar, a flash); stylesheets read `data-motion` instead.
+ */
+export function motionReduced(s: Pick<AppSettings, 'reducedMotion'> = current): boolean {
+  if (s.reducedMotion !== 'system') return s.reducedMotion === 'on';
+  return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
 /** Put on <html> what the CSS needs to know. Safe where there is no document (unit tests). */
@@ -107,8 +120,12 @@ export function updateSettings(patch: Partial<AppSettings>): AppSettings {
   return parsed.success ? commit(parsed.data) : current;
 }
 
+/**
+ * Every preference back to its default. `primerSeen` is kept: it records that the intro was shown, not a preference, and
+ * clearing it would send the learner back through the first-run primer for having tidied their settings.
+ */
 export function resetSettings(): AppSettings {
-  return commit(DEFAULT_SETTINGS);
+  return commit({ ...DEFAULT_SETTINGS, primerSeen: current.primerSeen });
 }
 
 export function subscribeSettings(fn: (s: AppSettings) => void): () => void {

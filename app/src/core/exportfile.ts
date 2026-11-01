@@ -185,6 +185,25 @@ export function mergeEvents(existing: readonly ReviewEvent[], incoming: readonly
   return { merged: [...byId.values()].sort(byTimeThenId), added, alreadyHere, conflicts };
 }
 
+export interface ImportCounts {
+  /** Events that would be written: their id is not in the log yet. */
+  added: number;
+  /** Events that are skipped because the log already has the id, or the file repeats it. */
+  alreadyHere: number;
+  /** Rows of the file that are not events and are left out. */
+  invalid: number;
+  /** Of the ones already here, how many differ from the stored event (the stored one is kept). */
+  conflicts: number;
+}
+
+/**
+ * The numbers the import screen shows before anything is written: "412 new, 30 already here, 0 invalid". Every row of
+ * the file lands in exactly one of the three first counts, so they add up to the number of rows.
+ */
+export function importCounts(parsed: { invalid: number; repeated: number }, merge: MergeResult): ImportCounts {
+  return { added: merge.added.length, alreadyHere: merge.alreadyHere + parsed.repeated, invalid: parsed.invalid, conflicts: merge.conflicts };
+}
+
 /** The prefix every callout id of a map carries: `de_mirage` gives `mirage.` */
 export function calloutPrefix(mapId: string): string {
   return `${mapSlug(mapId)}.`;

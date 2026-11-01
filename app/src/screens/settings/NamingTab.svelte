@@ -34,20 +34,20 @@
   }
 </script>
 
-<div class="st-panel st-one">
-  <section class="st-block">
+<div class="set-panel set-one">
+  <section class="set-block">
     <h2>Callout names</h2>
-    <div class="st-picks" role="radiogroup" aria-label="Callout names">
+    <div class="set-picks" role="radiogroup" aria-label="Callout names">
       {#each OPTIONS as o (o.id)}
-        <label class="st-pick">
+        <label class="set-pick">
           <input type="radio" name={group} value={o.id} checked={settings.naming === o.id} onchange={() => updateSettings({ naming: o.id })} />
-          <span class="st-pick-body">
-            <span class="st-pick-label">{o.label}</span>
-            <span class="sub st-pick-example">{shown(o.id)}</span>
+          <span class="set-pick-body">
+            <span class="set-pick-label">{o.label}</span>
+            <span class="sub set-pick-example">{shown(o.id)}</span>
           </span>
         </label>
       {/each}
     </div>
-    <p class="st-help">Community names are what players say in comms. Game names are the ones in the game's own text. Typed answers accept the names that are shown.</p>
+    <p class="set-help">Community names are what players say in comms. Game names are the ones in the game's own text. Typed answers accept the names that are shown.</p>
   </section>
 </div>

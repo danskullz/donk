@@ -36,6 +36,9 @@ async function openExisting(name: string): Promise<IDBPDatabase<CalloutsDB> | nu
   try {
     const db = await openDB<CalloutsDB>(name, DB_VERSION, {
       upgrade(_db, _old, _new, tx) {
+        // idb keeps a `done` promise for every transaction, and an abort rejects it. The rejection is expected here, and
+        // with nobody listening the browser reports it as an uncaught error on every first look at a log that is not there.
+        tx.done.catch(() => undefined);
         tx.abort(); // it did not exist: stop the creation
       },
     });
