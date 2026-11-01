@@ -5,17 +5,15 @@
   import { tick } from 'svelte';
   import '../styles/study.css';
   import { loadAvailableMaps, type MapData } from '../app/data';
+  import { loadLearner } from '../app/progress';
   import { getSettings, hardModeFor, subscribeSettings } from '../app/settings';
   import RegionMap from '../components/RegionMap.svelte';
-  import { replay } from '../core/log';
   import { coneFor, fitView, shapesFor } from '../core/mapview';
   import { displayName, otherName } from '../core/naming';
-  import { createScheduler } from '../core/scheduler';
   import type { Callout } from '../core/schema';
   import { playableCallouts } from '../core/session';
-  import { headingOf, masteryFills, type Fills } from '../core/stats';
+  import { headingOf, masteryFills, pageWindow, type Fills } from '../core/stats';
   import { MASTERY_STATES, type Mastery } from '../core/types';
-  import { openReviewStore } from '../storage/idb-store';
 
   let { map }: { map: string } = $props();
 
@@ -47,15 +45,10 @@
 
   $effect(() => subscribeSettings((s) => (settings = s)));
 
+  /** The map's tint from the review log. Reading only: it never creates the log or adds to it. Null when it cannot be read. */
   async function readFills(found: MapData): Promise<Fills | null> {
-    try {
-      const store = await openReviewStore(found.demo ? 'callouts-demo' : 'callouts');
-      const [{ events }, scheduler] = await Promise.all([store.load(), createScheduler()]);
-      return masteryFills(found.callouts, replay(events, scheduler), scheduler);
-    } catch (e) {
-      console.warn('The review log could not be read; the study screen shows no progress', e);
-      return null;
-    }
+    const learner = await loadLearner(found.demo);
+    return learner.failed ? null : masteryFills(found.callouts, learner.derived, learner.scheduler);
   }
 
   $effect(() => {
@@ -109,9 +102,10 @@
   const tourIdx = $derived(listed.findIndex((c) => c.id === selectedId));
 
   const perPage = $derived(Math.max(0, Math.floor(rowsHeight / rowHeight)));
-  const pageCount = $derived(perPage > 0 ? Math.max(1, Math.ceil(listed.length / perPage)) : 1);
-  const page = $derived(Math.min(pageCount - 1, Math.max(0, manualPage ?? (perPage > 0 && tourIdx >= 0 ? Math.floor(tourIdx / perPage) : 0))));
-  const visible = $derived(perPage > 0 ? listed.slice(page * perPage, page * perPage + perPage) : []);
+  const win = $derived(pageWindow(listed.length, perPage, manualPage, tourIdx));
+  const page = $derived(win.page);
+  const pageCount = $derived(win.pageCount);
+  const visible = $derived(listed.slice(win.from, win.to));
 
   const sel = $derived(selectedId ? (byId.get(selectedId) ?? null) : null);
   const shots = $derived(sel?.shots ?? []);
@@ -120,12 +114,19 @@
   const level = $derived(levelPick ?? sel?.level ?? data?.map.levels[0]?.id ?? 'default');
   const neighbours = $derived(sel ? sel.neighbours.flatMap((id) => byId.get(id) ?? []) : []);
   const gameName = $derived(sel ? otherName(sel, naming) : null);
+  /** Other names the community uses, which a typed answer also accepts. Hidden with "game names only". */
+  const aliases = $derived(sel && naming !== 'game' ? sel.aliases.join(', ') : '');
 
   function setSelected(id: string | null) {
     selectedId = id;
     shotIdx = 0;
     levelPick = null;
   }
+
+  // The Hard tier is offered only while Hard mode is on; a filter left on it would hide everything under an empty select.
+  $effect(() => {
+    if (tierFilter === '3' && !hasHard) tierFilter = 'all';
+  });
 
   // The selection must be in the list. A change of zone, filter or Hard mode can leave it outside; fall back to the first.
   $effect(() => {
@@ -205,8 +206,9 @@
     if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
       e.preventDefault();
       void step(e.key === 'ArrowLeft' ? -1 : 1, t instanceof HTMLElement && t.closest('.st-rows') !== null);
-    } else if (e.key === '[' || e.key === ']') {
-      goZone(e.key === '[' ? -1 : 1);
+    } else if (e.key === '[' || e.key === ']' || e.key === 'PageUp' || e.key === 'PageDown') {
+      e.preventDefault();
+      goZone(e.key === '[' || e.key === 'PageUp' ? -1 : 1);
     } else if (/^[1-9]$/.test(e.key) && Number(e.key) <= shots.length) {
       shotIdx = Number(e.key) - 1;
     }
@@ -351,7 +353,7 @@
           <div class="cap st-cap">
             {#if shot}{shot.kind} view · {shotIdx + 1} of {shots.length} · facing {headingOf(shot.yaw)}{:else}&nbsp;{/if}
           </div>
-          <div class="st-keys"><kbd>←</kbd><kbd>→</kbd> callout <kbd>1</kbd> to <kbd>{Math.max(1, Math.min(9, shots.length))}</kbd> screenshot <kbd>[</kbd><kbd>]</kbd> zone</div>
+          <div class="st-keys"><kbd>←</kbd><kbd>→</kbd> callout <kbd>1</kbd>{#if shots.length > 1}–<kbd class="to">{Math.min(9, shots.length)}</kbd>{/if} screenshot <kbd>PgUp</kbd><kbd>PgDn</kbd> zone</div>
         </section>
 
         <div class="st-where">
@@ -362,6 +364,7 @@
               {level}
               label="{data.map.displayName}{sel ? `, ${displayName(sel, naming)} selected` : ''}{cone ? ', with the camera position and facing' : ''}. The list is the keyboard route to every callout."
               interactive
+              follow
               {cone}
               {fills}
               art={data.art}
@@ -386,6 +389,7 @@
               </div>
               <p class="st-blurb">{sel.blurb}</p>
               {#if gameName}<p class="st-game sub">The game calls it <b>{gameName}</b></p>{/if}
+              {#if aliases}<p class="st-alias sub" title={aliases}>Also called <b>{aliases}</b></p>{/if}
               {#if neighbours.length > 0}
                 <div class="st-nbs">
                   <span class="eyebrow">Next to</span>

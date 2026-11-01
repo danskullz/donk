@@ -6,7 +6,8 @@ import { confusedPairs, type AnswerEvent, type ConfusionPair, type Derived, type
 import { applicableModes, masteryOf } from './mastery';
 import type { Scheduler } from './scheduler';
 import type { Callout } from './schema';
-import { MASTERY_STATES, MODES, PHASE1_MODES, type Mastery, type Mode } from './types';
+import { DEFAULT_SESSION_SETTINGS } from './session';
+import type { Mastery, Mode } from './types';
 
 // ---- days and weeks --------------------------------------------------------------------------------------------
 
@@ -196,35 +197,7 @@ export function speedTrend(points: readonly WeekPoint[]): SpeedTrend {
   return { latest, earliest, changeMs };
 }
 
-// ---- accuracy and totals ------------------------------------------------------------------------------------------
-
-export interface ModeStats {
-  mode: Mode;
-  answers: number;
-  correct: number;
-  /** 0 to 1. */
-  accuracy: number;
-  /** Median time of the correct answers, ms. */
-  medianMs: number | null;
-}
-
-/** Accuracy and typical speed per mode, for the modes that have answers, in the order of `MODES`. */
-export function accuracyByMode(events: readonly ReviewEvent[]): ModeStats[] {
-  const groups = new Map<Mode, { answers: number; correct: number; times: number[] }>();
-  for (const e of answersOf(events)) {
-    const g = groups.get(e.mode) ?? { answers: 0, correct: 0, times: [] };
-    g.answers += 1;
-    if (e.correct) {
-      g.correct += 1;
-      g.times.push(e.latencyMs);
-    }
-    groups.set(e.mode, g);
-  }
-  return MODES.flatMap((mode) => {
-    const g = groups.get(mode);
-    return g ? [{ mode, answers: g.answers, correct: g.correct, accuracy: g.correct / g.answers, medianMs: median(g.times) }] : [];
-  });
-}
+// ---- totals ---------------------------------------------------------------------------------------------------------
 
 export interface Totals {
   answers: number;
@@ -265,37 +238,19 @@ export function percent(part: number, whole: number): number | null {
 }
 
 // ---- mastery ---------------------------------------------------------------------------------------------------
+//
+// The per-map counts, "Core x of y" and the percent that Home, Map and Progress show are `mapProgress` in app/progress.ts,
+// so every screen quotes the same number. What is here is the part the Study and Summary screens need: the tint of each
+// callout, and a session's before and after.
 
 /** Mastery state by callout id: what the map draws as its tint (SCOPE §4.5). */
 export type Fills = Record<string, Mastery>;
-export type MasteryCounts = Record<Mastery, number>;
 
-export function masteryFills(callouts: readonly Callout[], derived: Derived, scheduler: Scheduler, enabled: readonly Mode[] = PHASE1_MODES): Fills {
+/** `enabled` defaults to the modes a session asks for, as `mapProgress` does, so the tint here is the tint on Home. */
+export function masteryFills(callouts: readonly Callout[], derived: Derived, scheduler: Scheduler, enabled: readonly Mode[] = DEFAULT_SESSION_SETTINGS.enabledModes): Fills {
   const out: Fills = {};
   for (const c of callouts) out[c.id] = masteryOf(c.id, derived, scheduler, applicableModes(c, enabled));
   return out;
-}
-
-export function masteryCounts(fills: Readonly<Fills>, ids: Iterable<string> = Object.keys(fills)): MasteryCounts {
-  const counts = Object.fromEntries(MASTERY_STATES.map((s) => [s, 0])) as MasteryCounts;
-  for (const id of ids) counts[fills[id] ?? 'new'] += 1;
-  return counts;
-}
-
-export const countAll = (counts: MasteryCounts): number => MASTERY_STATES.reduce((n, s) => n + counts[s], 0);
-
-/** Callouts that are Known or Automatic. */
-export const countKnown = (counts: MasteryCounts): number => counts.known + counts.automatic;
-
-/**
- * One number for a map: the average of how far each callout has come, New as 0 and Automatic as 100 with the states
- * evenly between. Null for a map with no callouts. The map's tint is the main display; this is the figure beside it.
- */
-export function masteryPercent(counts: MasteryCounts): number | null {
-  const total = countAll(counts);
-  if (total === 0) return null;
-  const sum = MASTERY_STATES.reduce((n, s, i) => n + i * counts[s], 0);
-  return Math.round((100 * sum) / ((MASTERY_STATES.length - 1) * total));
 }
 
 export interface MasteryChange {
@@ -336,3 +291,128 @@ export function headingOf(yawDeg: number): (typeof POINTS)[number] {
   const turn = ((yawDeg % 360) + 360) % 360;
   return POINTS[Math.round(turn / 45) % 8] as (typeof POINTS)[number];
 }
+
+// ---- paging and fitting (nothing on these screens scrolls, SCOPE §5.3) ---------------------------------------------------
+
+export interface PageWindow {
+  /** The page shown, from 0. */
+  page: number;
+  pageCount: number;
+  /** Indexes `from` up to but not including `to` are on this page. */
+  from: number;
+  to: number;
+}
+
+/**
+ * Which slice of a list is on screen. `perPage` comes from measuring the room (0 while that is unknown, which shows
+ * nothing rather than guessing). With no page picked by hand the page is the one holding `anchor`, the selected row, so a
+ * tour that steps past the end of a page turns it; a hand-picked page always wins.
+ */
+export function pageWindow(count: number, perPage: number, picked: number | null, anchor: number | null = null): PageWindow {
+  if (perPage <= 0 || count <= 0) return { page: 0, pageCount: 1, from: 0, to: 0 };
+  const pageCount = Math.max(1, Math.ceil(count / perPage));
+  const wanted = picked ?? (anchor !== null && anchor >= 0 ? Math.floor(anchor / perPage) : 0);
+  const page = Math.min(pageCount - 1, Math.max(0, wanted));
+  return { page, pageCount, from: page * perPage, to: Math.min(count, page * perPage + perPage) };
+}
+
+/**
+ * How many rows of each of several stacked lists fit in `room` px, when a row takes `row` px and a list's heading `head`.
+ * Every list gets a first row before any gets a second, so none is cut to nothing while another runs to full length. A
+ * list that cannot have even one row is dropped (0). `wants` is how many rows each would like; 0 means it has nothing.
+ */
+export function fitLists(room: number, wants: readonly number[], row: number, head: number): number[] {
+  const counts = wants.map(() => 0);
+  let used = 0;
+  const longest = Math.max(0, ...wants);
+  for (let round = 1; round <= longest; round++) {
+    for (let i = 0; i < wants.length; i++) {
+      if (counts[i] !== round - 1 || (wants[i] as number) < round) continue;
+      const cost = row + (round === 1 ? head : 0);
+      if (used + cost > room) continue;
+      used += cost;
+      counts[i] = round;
+    }
+  }
+  return counts;
+}
+
+// ---- words for numbers ---------------------------------------------------------------------------------------------
+
+/** `2.4 s`. */
+export const secondsText = (ms: number): string => `${(ms / 1000).toFixed(1)} s`;
+
+/** `2 nov`, local; the stylesheet capitalises nothing, the app is lowercase. */
+export function dayLabel(ms: number): string {
+  const d = new Date(ms);
+  return `${d.getDate()} ${MONTHS[d.getMonth()] as string}`;
+}
+
+// ---- drawing: sizes and geometry for the Progress charts (pixels in, pixels out; no DOM) -----------------------------------
+
+export interface HeatLayout {
+  /** Side of one day's square, px. */
+  cell: number;
+  /** Width kept at the left for the weekday letters; 0 when the squares are too small to label. */
+  gutter: number;
+}
+
+export interface HeatLayoutOptions {
+  gap?: number;
+  /** Height kept above the squares for the month names. */
+  head?: number;
+  gutter?: number;
+  min?: number;
+  max?: number;
+}
+
+/**
+ * The biggest square that lets `weeks` columns and 7 rows fit a box, so the grid fills what it is given and never
+ * overflows. Weekday letters come only when the squares are big enough (10 px) to carry them.
+ */
+export function heatLayout(width: number, height: number, weeks = 26, options: HeatLayoutOptions = {}): HeatLayout {
+  const { gap = 2, head = 14, gutter = 26, min = 4, max = 22 } = options;
+  const side = (g: number) => Math.floor(Math.min((width - g - gap * (weeks - 1)) / weeks, (height - head - gap * 7) / 7));
+  const labelled = side(gutter);
+  if (labelled >= 10) return { cell: Math.min(max, labelled), gutter };
+  return { cell: Math.max(min, Math.min(max, side(0))), gutter: 0 };
+}
+
+export interface Sparkline {
+  /** Runs of consecutive weeks that have a value, as SVG path data. A week without one breaks the line. */
+  paths: string[];
+  /** One dot per week that has a value; `last` marks the newest. */
+  dots: { x: number; y: number; index: number; last: boolean }[];
+  /** The value at the top of the chart. The bottom is 0. */
+  top: number;
+}
+
+/**
+ * A line chart of one value per week, for a box of `width` x `height` px with `pad` px around it. The scale starts at 0
+ * so a small change does not look like a big one, and tops out a little above the largest value.
+ */
+export function sparkline(values: readonly (number | null)[], width: number, height: number, pad = 6): Sparkline {
+  const known = values.filter((v): v is number => v !== null);
+  const top = Math.max(1, Math.ceil(Math.max(0, ...known) * 1.15));
+  const x = (i: number) => (values.length <= 1 ? width / 2 : pad + (i * (width - 2 * pad)) / (values.length - 1));
+  const y = (v: number) => height - pad - (v / top) * (height - 2 * pad);
+  const r = (n: number) => Math.round(n * 10) / 10;
+  const paths: string[] = [];
+  const dots: Sparkline['dots'] = [];
+  let run: string[] = [];
+  const close = () => {
+    if (run.length > 1) paths.push(run.join(''));
+    run = [];
+  };
+  const lastIndex = values.findLastIndex((v) => v !== null);
+  values.forEach((v, i) => {
+    if (v === null) return close();
+    run.push(`${run.length === 0 ? 'M' : 'L'}${r(x(i))} ${r(y(v))}`);
+    dots.push({ x: r(x(i)), y: r(y(v)), index: i, last: i === lastIndex });
+    if (i + 1 >= values.length || values[i + 1] === null) close();
+  });
+  return { paths, dots, top };
+}
+
+/** `5 weeks`, `1 week`. */
+export const weeksText = (n: number): string => `${n} ${n === 1 ? 'week' : 'weeks'}`;

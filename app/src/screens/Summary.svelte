@@ -20,28 +20,24 @@
   import '../styles/summary.css';
   import { getLastSession } from '../app/last-session';
   import { loadAvailableMaps, type MapData } from '../app/data';
+  import { loadLearner } from '../app/progress';
   import { getSettings, hardModeFor } from '../app/settings';
   import RegionMap from '../components/RegionMap.svelte';
-  import { replay } from '../core/log';
   import { fitView, shapesFor } from '../core/mapview';
   import { displayName } from '../core/naming';
-  import { createScheduler } from '../core/scheduler';
   import { playableCallouts } from '../core/session';
-  import { fillsAt, masteryFills, percent, type Fills } from '../core/stats';
+  import { fillsAt, fitLists, masteryFills, percent, secondsText as seconds, type Fills } from '../core/stats';
   import { MASTERY_STATES, type Mastery } from '../core/types';
-  import { openReviewStore } from '../storage/idb-store';
 
   let { map }: { map: string } = $props();
 
   const LABEL: Record<Mastery, string> = { new: 'New', seen: 'Seen', learning: 'Learning', familiar: 'Familiar', known: 'Known', automatic: 'Automatic' };
-  const seconds = (ms: number) => `${(ms / 1000).toFixed(1)} s`;
   const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
-  /** The lists are short on purpose: the screen has one viewport and the rest is on the Progress screen. */
-  const MAX_MIXED = 3;
-  const MAX_MOVED = 3;
+  /** Most rows a list ever shows; the room on screen can lower it (`fitLists`). The rest is on the Progress screen. */
+  const MAX_ROWS = 3;
 
-  // Read once: the hand-off lives for the page's life and a new session replaces this screen.
-  const last = getLastSession(map);
+  // The hand-off lives for the page's life and a new session replaces this screen, so it is not watched for changes.
+  const last = $derived(getLastSession(map));
   const settings = getSettings();
 
   let boot = $state<'loading' | 'ready' | 'unknown' | 'error'>('loading');
@@ -49,29 +45,26 @@
   let current = $state.raw<Fills>({});
 
   async function readFills(found: MapData): Promise<Fills> {
-    try {
-      const store = await openReviewStore(found.demo ? 'callouts-demo' : 'callouts');
-      const [{ events }, scheduler] = await Promise.all([store.load(), createScheduler()]);
-      return masteryFills(found.callouts, replay(events, scheduler), scheduler);
-    } catch (e) {
-      console.warn('The review log could not be read; the summary map shows only what the session changed', e);
-      return {};
-    }
+    const learner = await loadLearner(found.demo);
+    if (learner.failed) return {};
+    return masteryFills(found.callouts, learner.derived, learner.scheduler);
   }
 
   $effect(() => {
     let alive = true;
+    const wanted = map;
+    const hasSession = last !== null;
     (async () => {
       try {
         const maps = await loadAvailableMaps();
-        const found = maps.find((m) => m.map.id === map);
+        const found = maps.find((m) => m.map.id === wanted);
         if (!alive) return;
         if (!found) {
           boot = 'unknown';
           return;
         }
         // with no session there is no map to draw, so the log is not even read
-        const read = last ? await readFills(found) : {};
+        const read = hasSession ? await readFills(found) : {};
         if (!alive) return;
         data = found;
         current = read;
@@ -108,8 +101,6 @@
 
   const accuracy = $derived(summary ? percent(summary.correct, summary.answered) : null);
   const average = $derived(summary && summary.answered > 0 ? summary.totalMs / summary.answered : 0);
-  const mixed = $derived((summary?.confusions ?? []).slice(0, MAX_MIXED));
-  const moved = $derived(changes.slice(0, MAX_MOVED));
   const emptyText = $derived(
     !last || last.playable === 0
       ? 'This map has no callouts to learn yet.'
@@ -117,6 +108,39 @@
         ? "You have reached today's limit of answers. Come back tomorrow."
         : 'Nothing was due, and there was nothing new to introduce. Come back later.',
   );
+
+  // ---- the three lists share the room the left column has: every list gets a row before any gets a second ----
+  let listsEl = $state<HTMLElement>();
+  /** Pixels the lists may use. Unlimited where the page lays them out side by side and sizes itself to them (a phone upright). */
+  let room = $state(Infinity);
+  let pitch = $state({ row: 26, head: 58 });
+
+  $effect(() => {
+    const el = listsEl;
+    if (!el) return;
+    const measure = () => {
+      const css = getComputedStyle(el);
+      const sideBySide = css.gridTemplateColumns.split(' ').length > 1;
+      room = sideBySide ? Infinity : el.clientHeight;
+      // the stylesheet owns the sizes of a row and of a heading; it hands them over as custom properties
+      pitch = { row: parseFloat(css.getPropertyValue('--sm-row')) || 26, head: parseFloat(css.getPropertyValue('--sm-head')) || 58 };
+    };
+    measure();
+    const watch = new ResizeObserver(measure);
+    watch.observe(el);
+    return () => watch.disconnect();
+  });
+
+  const slowestAll = $derived(summary?.slowest ?? []);
+  const mixedAll = $derived(summary?.confusions ?? []);
+  const movedAll = $derived(changes);
+  // "Mixed up" always has something to say, even if it is only that nothing new happened
+  const rows = $derived(
+    fitLists(room, [Math.min(MAX_ROWS, slowestAll.length), Math.min(MAX_ROWS, Math.max(1, mixedAll.length)), Math.min(MAX_ROWS, movedAll.length)], pitch.row, pitch.head),
+  );
+  const slowest = $derived(slowestAll.slice(0, rows[0]));
+  const mixed = $derived(mixedAll.slice(0, rows[1]));
+  const moved = $derived(movedAll.slice(0, rows[2]));
 
   const go = (hash: string) => (location.hash = hash);
   const mapLabel = (when: string) => `${data?.map.displayName ?? ''} mastery ${when}`;
@@ -126,7 +150,7 @@
   <header class="bar">
     <span class="brand">callouts</span>
     <span class="crumb">
-      <a href="#/"><span class="sm-hide-s">Maps</span></a><span class="sm-hide-s"> / </span>{#if data}<a href="#/map/{data.map.id}">{data.map.displayName}</a> / {/if}<b>Summary</b>
+      <a href="#/"><span class="sm-hide-s">Maps</span></a><span class="sm-hide-s"> / </span>{#if data}<a href="#/map/{data.map.id}">{data.map.displayName}</a>{' / '}{/if}<b>Summary</b>
     </span>
   </header>
 
@@ -166,9 +190,11 @@
         <span class="eyebrow">{summary.finished ? 'Session complete' : 'Session ended early, everything is saved'}</span>
         <h1>{plural(summary.answered, 'card')} done</h1>
         <div class="stats">
-          <span><b>{accuracy ?? 0}%</b> correct</span>
-          <span><b>{summary.correct} of {summary.answered}</b> right</span>
-          <span><b>{seconds(average)}</b> average</span>
+          {#if summary.answered > 0}
+            <span><b>{accuracy ?? 0}%</b> correct</span>
+            <span><b>{summary.correct} of {summary.answered}</b> right</span>
+            <span><b>{seconds(average)}</b> average</span>
+          {/if}
           {#if summary.introduced.length > 0}<span><b>{summary.introduced.length}</b> new</span>{/if}
         </div>
       </div>
@@ -178,39 +204,39 @@
         <button class="btn" type="button" onclick={() => go('#/')}>Done</button>
       </div>
 
-      <div class="sm-lists">
-        {#if summary.slowest.length > 0}
+      <div class="sm-lists" bind:this={listsEl}>
+        {#if slowest.length > 0}
           <section aria-label="Slowest">
-            <h2>Slowest</h2>
+            <h2>Slowest{#if slowest.length < slowestAll.length}<span class="sub"> and {slowestAll.length - slowest.length} more</span>{/if}</h2>
             <ul class="sm-list">
-              {#each summary.slowest as s (s.calloutId + s.mode)}
+              {#each slowest as s (s.calloutId + s.mode)}
                 <li><span>{name(s.calloutId)}</span><span class="sub nums">{seconds(s.latencyMs)}</span></li>
               {/each}
             </ul>
           </section>
         {/if}
-        <section aria-label="New confusions">
-          <h2>Mixed up</h2>
-          {#if mixed.length > 0}
-            <ul class="sm-list">
-              {#each mixed as c (c.target + c.chosen)}
-                <li><span>{name(c.target)} for {name(c.chosen)}</span><span class="sub nums">{plural(c.count, 'time')}</span></li>
-              {/each}
-            </ul>
-            {#if summary.confusions.length > MAX_MIXED}<p class="sub sm-more">and {summary.confusions.length - MAX_MIXED} more</p>{/if}
-          {:else}
-            <p class="sub">Nothing new this time.</p>
-          {/if}
-        </section>
+        {#if (rows[1] ?? 0) > 0}
+          <section aria-label="New confusions">
+            <h2>Mixed up{#if mixed.length < mixedAll.length}<span class="sub"> and {mixedAll.length - mixed.length} more</span>{/if}</h2>
+            {#if mixedAll.length > 0}
+              <ul class="sm-list">
+                {#each mixed as c (c.target + c.chosen)}
+                  <li><span>{name(c.target)} for {name(c.chosen)}</span><span class="sub nums">{plural(c.count, 'time')}</span></li>
+                {/each}
+              </ul>
+            {:else}
+              <ul class="sm-list"><li class="sub">Nothing new this time.</li></ul>
+            {/if}
+          </section>
+        {/if}
         {#if moved.length > 0}
           <section aria-label="Moved up">
-            <h2>Moved up</h2>
+            <h2>Moved up{#if moved.length < movedAll.length}<span class="sub"> and {movedAll.length - moved.length} more</span>{/if}</h2>
             <ul class="sm-list">
               {#each moved as m (m.calloutId)}
                 <li><span>{name(m.calloutId)}</span><span class="sub">{LABEL[m.from]} → {LABEL[m.to]}</span></li>
               {/each}
             </ul>
-            {#if changes.length > MAX_MOVED}<p class="sub sm-more">and {changes.length - MAX_MOVED} more</p>{/if}
           </section>
         {/if}
       </div>
