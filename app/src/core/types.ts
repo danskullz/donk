@@ -37,7 +37,7 @@ export function stageOf(mode: Mode): Stage {
 /**
  * Multiple-choice style modes: answered by picking, so a guess has a floor (SCOPE §4.4 simulation). Speed call is
  * multiple choice too but is left out here: it never gets the gentle three-option start, and its time is measured
- * from the moment the picture hides (see rating.ts).
+ * from the moment the picture hides (see flashEnded in runner.ts).
  */
 export const CHOICE_MODES: readonly Mode[] = ['name-mc', 'read-map', 'which-view'];
 

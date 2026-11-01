@@ -64,6 +64,28 @@
 .chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .chips .eyebrow { margin-right: 2px; }
 
+/* ---- speed call: the picture flashes, hides, and then the name is chosen ---- */
+/* The plate keeps its size when the picture goes, so nothing under it moves while the learner looks for the answer. */
+.speed-blank { position: absolute; inset: 0; display: grid; place-content: center; color: var(--sub); font-size: var(--fs-lg); }
+.speed-shot.gone .speed-blank { color: var(--rule-strong); }
+.speed-cap { display: flex; align-items: center; gap: var(--s3); }
+/* The one countdown in the app (SCOPE §4.11). It drains once, left to right; with reduced motion only the number shows. */
+.speed-bar { flex: 1; height: 4px; min-width: 0; background: var(--seg-off); overflow: hidden; }
+.speed-bar i { display: block; height: 100%; background: var(--main); transform-origin: left center; animation: speed-drain linear forwards; }
+@keyframes speed-drain { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+.speed-count { flex: none; min-width: 5ch; text-align: right; color: var(--main); font-variant-numeric: tabular-nums; }
+.opts.waiting { opacity: 0.35; }
+
+/* ---- contrast card: two callouts the learner mixes up, side by side, nothing to answer ---- */
+.c-body { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: auto minmax(0, 1fr); gap: var(--s3) var(--s6); padding: var(--s5) var(--s6); min-height: 0; }
+.c-head { grid-column: 1 / -1; }
+.c-col { display: flex; flex-direction: column; gap: var(--s3); min-height: 0; min-width: 0; }
+.c-col .shot { max-height: calc(100% - 132px); }
+.c-text { display: grid; align-content: start; gap: var(--s2); min-width: 0; container-type: inline-size; }
+/* scaled to fit one line like the reveal's answer: --n is the name's length in characters, wrapping below 14 px */
+.c-name { font-size: clamp(14px, calc(100cqw / (var(--n, 9) * 0.58 + 0.4)), var(--fs-xl)); line-height: 1.1; font-weight: 500; letter-spacing: -0.04em; overflow-wrap: anywhere; }
+.c-text .blurb { color: var(--text); font-size: var(--fs-md); }
+
 /* ---- the end of a session ---- */
 .done-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); gap: var(--s6); padding: var(--s5) var(--s6); min-height: 0; }
 .done-main { display: grid; align-content: start; gap: var(--s4); min-width: 0; min-height: 0; }
@@ -145,6 +167,14 @@
   .zbtn { width: 44px; height: 44px; }
   .zoom { grid-auto-flow: column; right: var(--s2); top: var(--s2); }
 
+  .speed-blank { font-size: var(--fs-md); }
+  .c-body { grid-template-columns: 1fr; grid-template-rows: auto; align-content: start; gap: var(--s4); padding: var(--s3); }
+  .c-head { margin-bottom: calc(var(--s2) * -1); }
+  .c-col { flex-direction: row; align-items: flex-start; gap: var(--s3); }
+  .c-col .shot { flex: none; width: 46%; max-height: none; }
+  .c-text { flex: 1; gap: var(--s1); }
+  .c-text .blurb { font-size: var(--fs-sm); }
+
   .done-body { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); gap: var(--s3); padding: var(--s3); }
   .done-main h1 { font-size: 26px; }
   .done-main { gap: var(--s3); }
@@ -166,7 +196,12 @@
 /* short landscape (a phone on its side, 640 x 360 up to about 900 x 520): the desktop layout, compressed */
 @media (max-height: 520px) and (min-aspect-ratio: 4/3) {
   :root { --bar-h: 34px; --foot-h: 42px; --s4: 12px; --s5: 10px; --s6: 14px; --fs-hero: 24px; --fs-xl: 20px; }
-  .a-body, .s-body, .p-body, .done-body { padding: var(--s3) var(--s4); gap: var(--s4); }
+  .a-body, .s-body, .p-body, .done-body, .c-body { padding: var(--s3) var(--s4); gap: var(--s4); }
+  .c-body { grid-template-columns: 1fr; grid-template-rows: auto repeat(2, minmax(0, 1fr)); gap: var(--s2); }
+  .c-col { flex-direction: row; align-items: flex-start; gap: var(--s3); }
+  .c-col .shot { flex: none; width: auto; height: 100%; max-width: 50%; max-height: none; }
+  .c-text { flex: 1; gap: var(--s1); }
+  .c-text .chips { display: none; }
   .a-right, .p-right, .s-right { gap: var(--s2); }
   .prompt .big { font-size: 18px; }
   .opts { gap: 4px; }

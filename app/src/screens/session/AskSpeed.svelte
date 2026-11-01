@@ -71,7 +71,7 @@
       <span>Plate {String(number).padStart(2, '0')}</span>
       {#if flashing}
         {#if showing && !reduced}
-          <span class="speed-bar" aria-hidden="true"><i style:animation-duration|important="{prompt.flashMs}ms"></i></span>
+          <span class="speed-bar" aria-hidden="true"><i style:animation-duration="{prompt.flashMs}ms"></i></span>
         {/if}
         <span class="speed-count" aria-hidden="true">{showing ? countdown : ''}</span>
       {/if}
