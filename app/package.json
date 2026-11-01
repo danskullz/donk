@@ -16,6 +16,7 @@
     "content:art": "node scripts/make-art.mjs",
     "content:process": "node scripts/process-shots.mjs",
     "content:validate": "node scripts/validate-content.mjs",
+    "content:init-map": "node scripts/init-map.mjs",
     "content:all": "node scripts/make-art.mjs && node scripts/validate-content.mjs"
   },
   "dependencies": {
