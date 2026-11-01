@@ -1,0 +1,70 @@
+/* The Summary screen (SCOPE.md §4.3 step 5): numbers on the left, the map before and after on the right. Built from the
+   session's end screen (session.css, .done-*) and the map plates in the same grid rules; nothing scrolls (SCOPE §5.3).
+   The mastery swatch (.mgl) is in study.css. */
+
+.sm { grid-template-rows: var(--bar-h) minmax(0, 1fr); }
+.sm a { color: inherit; }
+.sm .crumb a { text-decoration: none; }
+.sm .crumb a:hover { color: var(--text); text-decoration: underline; }
+
+.sm-notice { display: grid; align-content: center; justify-items: start; gap: var(--s3); padding: var(--s6); }
+.sm-notice h1 { font-size: var(--fs-xl); font-weight: 600; letter-spacing: -0.03em; }
+.sm-notice p { color: var(--sub); max-width: 52ch; }
+.sm-notice a { color: var(--text); text-decoration: underline; }
+
+.sm-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); grid-template-rows: auto auto minmax(0, 1fr); grid-template-areas: "head maps" "acts maps" "lists maps"; gap: var(--s4) var(--s6); padding: var(--s5) var(--s6); min-height: 0; }
+.sm-head { grid-area: head; display: grid; gap: var(--s2); align-content: start; min-width: 0; }
+.sm-head h1 { font-size: 44px; line-height: 1; font-weight: 600; letter-spacing: -0.05em; overflow-wrap: anywhere; }
+.sm-head .stats { display: flex; flex-wrap: wrap; gap: var(--s2) var(--s4); font-size: var(--fs-sm); color: var(--sub); }
+.sm-head .stats b { color: var(--text); font-weight: 500; }
+
+.sm-acts { display: flex; gap: var(--s2); }
+.sm-body .sm-acts { grid-area: acts; }
+.sm-acts .btn { height: 44px; text-decoration: none; }
+
+.sm-lists { grid-area: lists; display: grid; align-content: start; gap: var(--s4); min-width: 0; min-height: 0; }
+.sm-lists h2 { font-size: var(--fs-sm); font-weight: 500; color: var(--sub); border-bottom: 1px solid var(--rule); padding-bottom: var(--s2); margin-bottom: var(--s2); }
+.sm-list { display: grid; gap: 6px; font-size: var(--fs-md); margin: 0; padding: 0; list-style: none; }
+.sm-list li { display: flex; justify-content: space-between; gap: var(--s3); min-width: 0; }
+.sm-list li span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sm-list .sub { flex: none; font-size: var(--fs-xs); white-space: nowrap; }
+.sm-lists p.sub { font-size: var(--fs-sm); }
+.sm-more { margin-top: 4px; }
+
+.sm-maps { grid-area: maps; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; gap: var(--s3); min-height: 0; min-width: 0; }
+.sm-nomap { align-self: start; }
+.sm-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s3); min-height: 0; min-width: 0; }
+.solo .sm-pair { grid-template-columns: minmax(0, 1fr); }
+.sm-fig { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; gap: var(--s2); margin: 0; min-height: 0; min-width: 0; }
+.sm-plate { display: grid; padding: var(--s2); min-height: 0; overflow: hidden; }
+.sm-plate .stage { min-height: 0; min-width: 0; }
+.sm-fig .cap { white-space: normal; }
+.sm-legend { display: flex; flex-wrap: wrap; gap: var(--s2) var(--s4); font-size: var(--fs-xs); color: var(--sub); }
+.sm-legend > span { display: inline-flex; align-items: center; gap: 6px; }
+
+/* ---- a phone in portrait ---- */
+@media (max-width: 820px) and (max-aspect-ratio: 4/3) {
+  .sm-hide-s { display: none; }
+  .sm-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto auto; grid-template-areas: "head" "maps" "lists" "acts"; gap: var(--s3); padding: var(--s3); }
+  .sm-head { gap: var(--s1); }
+  .sm-head h1 { font-size: 26px; }
+  .sm-lists { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s3); }
+  .sm-lists section:nth-child(n+3) { display: none; }
+  .sm-legend { display: none; }
+  .sm-acts .btn { flex: 1; }
+  .sm-notice { padding: var(--s4); }
+}
+
+/* ---- a phone on its side ---- */
+@media (max-height: 520px) and (min-aspect-ratio: 4/3) {
+  .sm-body { padding: var(--s3) var(--s4); gap: var(--s2) var(--s4); }
+  .sm-head h1 { font-size: 26px; }
+  .sm-head .stats { font-size: var(--fs-xs); }
+  .sm-acts .btn { height: 34px; }
+  .sm-lists { gap: var(--s2); }
+  .sm-lists section:nth-child(n+3) { display: none; }
+  .sm-lists h2 { margin-bottom: var(--s1); padding-bottom: var(--s1); }
+  .sm-list { gap: 3px; font-size: var(--fs-sm); }
+  .sm-legend { display: none; }
+  .sm-notice { padding: var(--s3) var(--s4); }
+}

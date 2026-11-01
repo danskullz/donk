@@ -8,28 +8,48 @@
     note: SessionPlan['note'];
     /** How many callouts this map has that could be taught right now. */
     playableCount: number;
+    /** Nothing was due, and the items closest to due could be practised instead. */
+    canPractise: boolean;
     name: (calloutId: string) => string;
     onagain: () => void;
+    onpractise: () => void;
     ondone: () => void;
+    /** The full Summary screen for this map. */
+    onsummary: () => void;
   }
 
-  let { summary, note, playableCount, name, onagain, ondone }: Props = $props();
+  let { summary, note, playableCount, canPractise, name, onagain, onpractise, ondone, onsummary }: Props = $props();
 
   const accuracy = $derived(summary.answered ? Math.round((100 * summary.correct) / summary.answered) : 0);
   const average = $derived(summary.answered ? summary.totalMs / summary.answered : 0);
+  const empty = $derived(summary.answered === 0 && summary.introduced.length === 0);
+  const early = $derived(summary.earlyPractice === true);
   const emptyText = $derived(
     playableCount === 0
       ? 'This map has no callouts to learn yet.'
       : note === 'daily-cap'
         ? "You have reached today's limit of answers. Come back tomorrow."
-        : 'Nothing is due right now, and there is nothing new to introduce. Come back later.',
+        : canPractise
+          ? 'Nothing is due right now, and there is nothing new to introduce. You can practise the items closest to due.'
+          : 'Nothing is due right now, and there is nothing new to introduce. Come back later.',
+  );
+  const eyebrow = $derived(
+    summary.answered === 0
+      ? 'No session'
+      : !summary.finished
+        ? 'Session ended early, everything is saved'
+        : early
+          ? 'Early practice complete'
+          : summary.endedBy === 'time'
+            ? 'Time is up, session complete'
+            : 'Session complete',
   );
 </script>
 
 <main class="done-body">
   <div class="done-main">
-    <span class="eyebrow">{summary.answered === 0 ? 'No session' : summary.finished ? 'Session complete' : 'Session ended early, everything is saved'}</span>
-    {#if summary.answered === 0 && summary.introduced.length === 0}
+    <span class="eyebrow">{eyebrow}</span>
+    {#if empty}
       <h1>Nothing to do</h1>
       <p class="sub">{emptyText}</p>
     {:else}
@@ -39,10 +59,16 @@
         <span><b>{seconds(average)}</b> average</span>
         <span><b>{summary.introduced.length}</b> new</span>
       </div>
+      {#if early}<p class="sub">Early practice: nothing here was due yet, so it moves the next review out less.</p>{/if}
     {/if}
     <div class="acts">
-      {#if summary.answered > 0}<button class="btn primary" type="button" onclick={onagain}>Another round</button>{/if}
-      <button class="btn" class:primary={summary.answered === 0} type="button" onclick={ondone}>Done</button>
+      {#if empty && canPractise}
+        <button class="btn primary" type="button" onclick={onpractise}>Practise anyway</button>
+      {:else if summary.answered > 0}
+        <button class="btn primary" type="button" onclick={onagain}>Another round</button>
+      {/if}
+      <button class="btn" class:primary={summary.answered === 0 && !(empty && canPractise)} type="button" onclick={ondone}>Done</button>
+      {#if !empty}<button class="btn" type="button" onclick={onsummary}>Full summary</button>{/if}
     </div>
   </div>
   <div class="done-side">

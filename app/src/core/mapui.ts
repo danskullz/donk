@@ -112,8 +112,10 @@ export interface Anchored {
 export function neighbourInDirection(items: readonly Anchored[], fromId: string, dir: Direction): string | null {
   const from = items.find((i) => i.id === fromId);
   if (!from) return null;
-  let best: { id: string; score: number } | null = null;
-  let bestOutside: { id: string; score: number } | null = null;
+  type Best = { id: string; score: number };
+  const better = (score: number, id: string, than: Best | null) => than === null || score < than.score || (score === than.score && id < than.id);
+  let inCone: Best | null = null;
+  let outside: Best | null = null;
   for (const it of items) {
     if (it.id === fromId) continue;
     const dx = it.anchor[0] - from.anchor[0];
@@ -122,14 +124,13 @@ export function neighbourInDirection(items: readonly Anchored[], fromId: string,
     const across = Math.abs(dir === 'left' || dir === 'right' ? dy : dx);
     if (along <= 0) continue;
     const score = along + 2 * across;
-    const slot = across <= along ? 'in' : 'out';
-    const current = slot === 'in' ? best : bestOutside;
-    if (!current || score < current.score || (score === current.score && it.id < current.id)) {
-      if (slot === 'in') best = { id: it.id, score };
-      else bestOutside = { id: it.id, score };
+    if (across <= along) {
+      if (better(score, it.id, inCone)) inCone = { id: it.id, score };
+    } else if (better(score, it.id, outside)) {
+      outside = { id: it.id, score };
     }
   }
-  return (best ?? bestOutside)?.id ?? null;
+  return (inCone ?? outside)?.id ?? null;
 }
 
 // ----------------------------------------------------------------------------------------------- label collisions

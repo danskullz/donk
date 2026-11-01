@@ -1,0 +1,151 @@
+/* The Study screen (SCOPE.md §4.8, §5.1) and the mastery swatch the Summary and Progress screens share.
+   No comp exists for Study: it is built from the Map screen's pieces (design/screens.css: list rows, pager, peek) and the
+   reveal's (screenshot plate, chips) in the same grid rules. Three panes side by side; on a phone in portrait they take
+   turns in one slot; on a phone on its side the same three panes are compressed. Nothing scrolls (SCOPE §5.3). */
+
+/* ---- the mastery swatch: a shape or pattern as well as a colour for each state (SCOPE §4.10, §6.2) ---- */
+.mgl { display: inline-block; flex: none; width: 14px; height: 14px; border: 1px solid var(--rule-strong); background: var(--m-new); }
+.mgl[data-s="seen"] { background: repeating-linear-gradient(45deg, var(--m-new) 0 2.4px, var(--m-seen-line) 2.4px 4px); }
+.mgl[data-s="learning"] { background: radial-gradient(circle at 50% 50%, var(--m-learning-dot) 0 1.5px, transparent 1.6px) 0 0 / 7px 7px, var(--m-learning); }
+.mgl[data-s="familiar"] { background: var(--m-familiar); }
+.mgl[data-s="known"] { background: var(--m-known); }
+.mgl[data-s="automatic"] { background: var(--m-auto); }
+
+/* ---- shell ---- */
+.st { grid-template-rows: var(--bar-h) minmax(0, 1fr); }
+.st a { color: inherit; }
+.st a.btn { text-decoration: none; }
+.st a.btn.primary { color: var(--main-ink); }
+.st .crumb a { text-decoration: none; }
+.st .crumb a:hover { color: var(--text); text-decoration: underline; }
+.st-notice { display: grid; place-content: center; justify-items: start; gap: var(--s3); padding: var(--s6); }
+.st-notice h1 { font-size: var(--fs-xl); font-weight: 600; letter-spacing: -0.03em; }
+.st-notice p { color: var(--sub); max-width: 52ch; }
+.st-notice a { color: var(--text); text-decoration: underline; }
+.st-link { color: var(--main); text-decoration: underline; font-size: inherit; }
+
+.st-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2.2fr) minmax(0, 1.15fr); grid-template-rows: minmax(0, 1fr); gap: var(--s6); padding: var(--s5) var(--s6); min-height: 0; }
+.st-views { display: none; }
+
+/* ---- left: zone, filters, list ---- */
+.st-nav { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr) auto; gap: var(--s2); min-height: 0; min-width: 0; }
+.st-zone { display: grid; grid-template-columns: 36px minmax(0, 1fr) 36px; align-items: center; height: 36px; }
+.st-zname { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
+.st-zname b { font-weight: 600; }
+.st-step { display: grid; place-items: center; width: 36px; height: 36px; background: var(--surface); color: var(--text); transition: background-color var(--t-fast) ease; }
+.st-step svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+.st-step:hover:not(:disabled) { background: var(--surface-hi); }
+.st-step:active:not(:disabled) { background: var(--surface-lo); }
+.st-step:disabled { opacity: 0.4; cursor: not-allowed; }
+.st-step.sm { width: 28px; height: 28px; }
+.st-filters { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--s2); }
+.st-sel { width: 100%; min-width: 0; height: 32px; padding: 0 var(--s2); border: 0; border-bottom: 2px solid var(--rule-strong); border-radius: 0; background: var(--surface); color: var(--text); font: inherit; font-size: var(--fs-sm); text-transform: inherit; }
+.st-sel:hover { background: var(--surface-hi); }
+.st-sel:focus-visible { border-bottom-color: var(--main); }
+.st-sel option { background: var(--surface); color: var(--text); }
+
+.st-rows { display: grid; align-content: start; min-height: 0; overflow: hidden; container-type: inline-size; }
+.st-row { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; align-items: center; gap: var(--s3); height: 36px; padding: 0 var(--s3); border-bottom: 1px solid var(--rule); text-align: left; transition: background-color var(--t-fast) ease; }
+.st-row:hover { background: var(--surface-hi); }
+.st-row[aria-current="true"] { background: var(--surface); }
+.st-nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-md); font-weight: 500; }
+.st-nm::before { content: "> " / ""; color: transparent; white-space: pre; }
+.st-row[aria-current="true"] .st-nm::before { color: var(--main); }
+.st-row.nested { padding-left: 26px; box-shadow: inset 2px 0 0 var(--rule-strong); }
+.st-row.nested .st-nm { font-weight: 400; }
+.st-st { font-size: var(--fs-xs); color: var(--sub); white-space: nowrap; }
+/* in a narrow column the swatch carries the state; the word stays for screen readers */
+@container (max-width: 200px) {
+  .st-st { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+}
+
+.st-pager { display: flex; align-items: center; gap: var(--s2); min-height: 28px; font-size: var(--fs-xs); color: var(--sub); }
+.st-count { margin-left: auto; }
+
+/* ---- middle: the large screenshot and its thumbnails ---- */
+.st-photo { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto auto auto; gap: var(--s2); min-height: 0; min-width: 0; }
+.st-shot { min-height: 0; overflow: hidden; }
+.st-shot img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.st-none { position: absolute; inset: 0; display: grid; place-content: center; padding: var(--s4); text-align: center; }
+.st-thumbs { display: grid; grid-template-columns: repeat(var(--n, 1), minmax(0, 1fr)); gap: var(--s2); height: 56px; max-width: calc(var(--n, 1) * 112px); }
+.st-thumb { position: relative; min-width: 0; padding: 0; overflow: hidden; background: var(--surface); }
+.st-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.st-thumb:hover { outline: 2px solid var(--text); outline-offset: -2px; }
+.st-thumb[aria-current="true"] { outline: 2px solid var(--main); outline-offset: -2px; }
+.st-cap { min-height: 1.5em; }
+.st-keys { font-size: var(--fs-xs); color: var(--sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-keys kbd + kbd { margin-left: 4px; }
+
+/* ---- right: where it is, and what it is ---- */
+.st-where { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; gap: var(--s4); min-height: 0; min-width: 0; }
+.st-map { display: grid; padding: var(--s2); min-height: 0; overflow: hidden; }
+.st-map .stage { min-height: 0; min-width: 0; }
+.st-levels { position: absolute; z-index: 2; left: var(--s2); bottom: var(--s2); display: flex; gap: 2px; }
+.st-vt { height: 32px; padding: 0 var(--s3); background: var(--bg); color: var(--sub); font-weight: 500; font-size: var(--fs-sm); transition: background-color var(--t-fast) ease, color var(--t-fast) ease; }
+.st-vt:hover { color: var(--text); background: var(--surface-hi); }
+.st-vt[aria-pressed="true"] { color: var(--main); box-shadow: inset 0 -2px 0 var(--main); }
+
+.st-about { display: grid; gap: var(--s2); align-content: start; container-type: inline-size; min-width: 0; }
+/* scaled to fit one line: --n is the name's length in characters (the same rule as the reveal's answer) */
+.st-name { font-size: clamp(14px, calc(100cqw / (var(--n, 9) * 0.6 + 0.4)), 26px); line-height: 1.15; font-weight: 600; letter-spacing: -0.03em; overflow-wrap: anywhere; }
+.st-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.st-state { color: var(--text); }
+.st-blurb { font-size: var(--fs-md); }
+.st-game { font-size: var(--fs-sm); }
+.st-game b { color: var(--text); font-weight: 500; }
+.st-nbs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.st-nb { color: var(--text); cursor: pointer; transition: background-color var(--t-fast) ease; }
+.st-nb:hover { background: var(--surface-hi); }
+.st-tour { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: var(--s2); margin-top: var(--s1); }
+.st-tour .btn { padding: 0 var(--s2); }
+.st-pos { color: var(--sub); font-size: var(--fs-xs); text-align: center; min-width: 6ch; }
+
+/* ---- a phone in portrait: the three panes take turns in one slot, the callout's details stay below it ---- */
+@media (max-width: 820px) and (max-aspect-ratio: 4/3) {
+  .st-hide-s { display: none; }
+  .st-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto; gap: var(--s2); padding: var(--s3); }
+  .st-views { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s2); }
+  .st-views .st-vt { height: 40px; background: var(--surface); }
+  .st-where { display: contents; }
+  .st-nav, .st-photo, .st-map { display: none; grid-column: 1; grid-row: 2; }
+  .st-body[data-view="list"] .st-nav { display: grid; }
+  .st-body[data-view="photo"] .st-photo { display: grid; }
+  .st-body[data-view="map"] .st-map { display: grid; }
+  .st-about { grid-column: 1; grid-row: 3; }
+  .st-keys { display: none; }
+  .st-zone { grid-template-columns: 44px minmax(0, 1fr) 44px; height: 44px; }
+  .st-step { width: 44px; height: 44px; }
+  .st-step.sm { width: 40px; height: 36px; }
+  .st-sel { height: 40px; }
+  .st-row { height: 44px; }
+  .st-thumbs { height: 48px; }
+  .st-tour .btn { height: 44px; }
+  .st-levels .st-vt { height: 40px; }
+}
+
+/* ---- a phone on its side (640 x 360 up to about 900 x 520): the three panes side by side, compressed ---- */
+@media (max-height: 520px) and (min-aspect-ratio: 4/3) {
+  .st-body { grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.7fr) minmax(0, 1fr); padding: var(--s3) var(--s4); gap: var(--s4); }
+  .st-nav { gap: var(--s1); }
+  .st-zone { grid-template-columns: 28px minmax(0, 1fr) 28px; height: 28px; font-size: var(--fs-sm); }
+  .st-step { width: 28px; height: 28px; }
+  .st-step.sm { width: 24px; height: 22px; }
+  .st-sel { height: 26px; font-size: var(--fs-xs); padding: 0 var(--s1); }
+  .st-row { height: 26px; gap: var(--s2); padding: 0 var(--s2); }
+  .st-nm { font-size: var(--fs-sm); }
+  .st-pager { min-height: 22px; }
+  .st-photo { gap: var(--s1); }
+  .st-thumbs { height: 34px; }
+  .st-cap, .st-keys, .st-game, .st-nbs { display: none; }
+  .st-where { gap: var(--s2); }
+  .st-about { gap: var(--s1); }
+  .st-name { font-size: clamp(13px, calc(100cqw / (var(--n, 9) * 0.6 + 0.4)), 18px); }
+  .st-blurb { font-size: var(--fs-xs); line-height: 1.4; }
+  .st-tour .btn { height: 28px; font-size: var(--fs-sm); }
+  .st-vt { height: 26px; }
+}
+
+@media (forced-colors: active) {
+  .st-row[aria-current="true"], .st-thumb[aria-current="true"], .st-vt[aria-pressed="true"] { outline: 2px solid Highlight; outline-offset: -2px; }
+  .st-sel, .st-step { border: 1px solid ButtonText; }
+}

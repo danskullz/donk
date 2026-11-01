@@ -219,11 +219,16 @@ export async function storageReport(): Promise<StorageReport> {
   }
 }
 
-/** The service worker that makes the app open offline: `unavailable` in development builds and without https/localhost. */
-export type WorkerState = 'unavailable' | 'installing' | 'ready';
+/**
+ * The service worker that makes the app open offline. `development`: this is not a production build, which never
+ * registers one. `unavailable`: the browser has none here (it needs https or localhost). `installing`: registered, not
+ * yet in control of this page. `ready`: in control, so a reload with no connection works.
+ */
+export type WorkerState = 'development' | 'unavailable' | 'installing' | 'ready';
 
 export async function workerState(): Promise<WorkerState> {
-  if (!import.meta.env.PROD || typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return 'unavailable';
+  if (!import.meta.env.PROD) return 'development';
+  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return 'unavailable';
   const registration = await navigator.serviceWorker.getRegistration();
   return registration?.active && navigator.serviceWorker.controller ? 'ready' : 'installing';
 }

@@ -4,7 +4,7 @@ import { applicableModes, masteryOf, stageCleared, unlockedModes, unlockedStages
 import { createScheduler, type Scheduler } from './scheduler';
 import { makeCallouts } from './test-fixtures';
 import { answer, drive, intro } from './test-helpers';
-import { DAY_MS, Grade, PHASE1_MODES } from './types';
+import { DAY_MS, Grade, MODES, PHASE1_MODES } from './types';
 
 const T0 = Date.parse('2026-02-01T09:00:00Z');
 const C = 'test.mid';
@@ -98,5 +98,50 @@ describe('which modes are open', () => {
     const noShots = { ...makeCallouts()[1]!, shots: [] };
     expect(applicableModes(noShots, PHASE1_MODES)).toEqual(['read-map', 'pin', 'name-typed']);
     expect(applicableModes(makeCallouts()[1]!, PHASE1_MODES)).toEqual([...PHASE1_MODES]);
+  });
+});
+
+describe('Speed call (stage 5, SCOPE §4.4)', () => {
+  /** Recognise, Locate and Recall cleared; Where am I? answered right at each due date `times` times. */
+  function placed(times: number) {
+    const d = createDerived();
+    applyEvent(d, intro(C, T0), s);
+    for (const m of ['name-mc', 'read-map', 'which-view'] as const) applyEvent(d, answer(C, m, T0, Grade.Good), s);
+    drive(d, s, C, 'pin', T0, [Grade.Good, Grade.Good]);
+    drive(d, s, C, 'name-typed', T0, [Grade.Good, Grade.Good]);
+    drive(d, s, C, 'where-am-i', T0, Array.from({ length: times }, () => Grade.Good));
+    return d;
+  }
+  const whereStability = (d: ReturnType<typeof createDerived>) => s.stabilityDays(d.items.get(`${C}:where-am-i`)!.memory);
+
+  it('is open only when Where am I? is stable for 21 days', () => {
+    for (let times = 1; times <= 4; times++) {
+      const d = placed(times);
+      const open = whereStability(d) >= 21;
+      expect(unlockedStages(C, d, s, MODES), `after ${times} reviews, stability ${whereStability(d).toFixed(1)}`).toEqual(open ? [1, 2, 3, 4, 5] : [1, 2, 3, 4]);
+      expect(unlockedModes(C, d, s, MODES).includes('speed')).toBe(open);
+    }
+    expect(whereStability(placed(4))).toBeGreaterThanOrEqual(21);
+    expect(whereStability(placed(1))).toBeLessThan(21);
+  });
+
+  it('stays shut while an earlier stage is not stable, however well Where am I? goes', () => {
+    const d = createDerived();
+    applyEvent(d, intro(C, T0), s);
+    for (const m of ['name-mc', 'read-map', 'which-view'] as const) applyEvent(d, answer(C, m, T0, Grade.Good), s);
+    drive(d, s, C, 'where-am-i', T0, [Grade.Good, Grade.Good, Grade.Good, Grade.Good]);
+    expect(unlockedModes(C, d, s, MODES)).not.toContain('speed');
+  });
+
+  it('is not offered when the learner turned it off, or the callout has no screenshot', () => {
+    const d = placed(4);
+    expect(unlockedModes(C, d, s, PHASE1_MODES)).not.toContain('speed');
+    const noShots = { ...makeCallouts()[1]!, shots: [] };
+    expect(applicableModes(noShots, MODES)).not.toContain('speed');
+    expect(applicableModes(makeCallouts()[1]!, MODES)).toContain('speed');
+  });
+
+  it('does not change the mastery state: Automatic is still about the typed answers', () => {
+    expect(masteryOf(C, placed(4), s, MODES)).toBe('automatic');
   });
 });
