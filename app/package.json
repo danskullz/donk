@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "check:budget": "node scripts/check-budget.mjs",
+    "check:runes": "node scripts/check-runes.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "e2e": "playwright test",
