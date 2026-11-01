@@ -3,29 +3,31 @@ import { replay, type ReviewEvent } from './log';
 import { createScheduler, type Scheduler } from './scheduler';
 import { makeCallouts } from './test-fixtures';
 import { answer, intro } from './test-helpers';
-import { Grade } from './types';
+import { Grade, MODES } from './types';
 import {
-  accuracyByMode,
   addDays,
   answersPerDay,
-  countAll,
-  countKnown,
   dateKey,
+  dayLabel,
   fillsAt,
+  fitLists,
   headingOf,
   heatGrid,
+  heatLayout,
   heatLevel,
   mapConfusions,
-  masteryCounts,
   masteryFills,
-  masteryPercent,
   median,
+  pageWindow,
   percent,
+  secondsText,
+  sparkline,
   speedTrend,
   startOfDay,
   startOfWeek,
   totals,
   weeklyLatency,
+  weeksText,
 } from './stats';
 
 // All times are built from local calendar fields, so the tests mean the same thing in any time zone.
@@ -218,7 +220,7 @@ describe('speedTrend', () => {
   });
 });
 
-describe('accuracyByMode and totals', () => {
+describe('totals', () => {
   const events: ReviewEvent[] = [
     intro('test.mid', at(2026, 11, 1, 8)),
     right('test.mid', at(2026, 11, 1, 9), 1000, 'name-mc'),
@@ -226,12 +228,6 @@ describe('accuracyByMode and totals', () => {
     wrong('test.mid', at(2026, 11, 2, 9), 'test.a-ramp', 'name-mc'),
     right('test.mid', at(2026, 11, 2, 9), 7000, 'pin'),
   ];
-  it('reports answers, accuracy and median time of right answers per mode, in the order of the modes', () => {
-    expect(accuracyByMode(events)).toEqual([
-      { mode: 'name-mc', answers: 3, correct: 2, accuracy: 2 / 3, medianMs: 2000 },
-      { mode: 'pin', answers: 1, correct: 1, accuracy: 1, medianMs: 7000 },
-    ]);
-  });
   it('totals answers, accuracy, active days, callouts met and the span of the log', () => {
     expect(totals(events)).toEqual({
       answers: 4,
@@ -243,8 +239,10 @@ describe('accuracyByMode and totals', () => {
       lastTs: at(2026, 11, 2, 9),
     });
   });
+  it('counts a callout met by an intro card alone, but not as an answer', () => {
+    expect(totals([intro('test.mid', 5)])).toEqual({ answers: 0, correct: 0, accuracy: null, activeDays: 0, met: 1, firstTs: 5, lastTs: 5 });
+  });
   it('handles an empty log', () => {
-    expect(accuracyByMode([])).toEqual([]);
     expect(totals([])).toEqual({ answers: 0, correct: 0, accuracy: null, activeDays: 0, met: 0, firstTs: null, lastTs: null });
   });
   it('percent is whole numbers, or null with nothing to divide', () => {
@@ -268,22 +266,9 @@ describe('mastery summaries', () => {
     const derived = replay([intro('test.mid', T0), right('test.mid', T0 + 1000)], s);
     expect(masteryFills(callouts, derived, s)['test.mid']).toBe('learning');
   });
-  it('counts states, ignoring ids that are not in the fills as New', () => {
-    const fills = { a: 'known', b: 'new', c: 'automatic', d: 'known' } as const;
-    const counts = masteryCounts(fills);
-    expect(counts).toEqual({ new: 1, seen: 0, learning: 0, familiar: 0, known: 2, automatic: 1 });
-    expect(countAll(counts)).toBe(4);
-    expect(countKnown(counts)).toBe(3);
-    expect(masteryCounts(fills, ['a', 'zzz']).new).toBe(1);
-    expect(masteryCounts(fills, ['a', 'zzz']).known).toBe(1);
-  });
-  it('turns the counts into one percentage: New is 0, Automatic is 100, and an empty map has none', () => {
-    const empty = masteryCounts({});
-    expect(masteryPercent(empty)).toBeNull();
-    expect(masteryPercent(masteryCounts({ a: 'new', b: 'new' }))).toBe(0);
-    expect(masteryPercent(masteryCounts({ a: 'automatic', b: 'automatic' }))).toBe(100);
-    expect(masteryPercent(masteryCounts({ a: 'new', b: 'automatic' }))).toBe(50);
-    expect(masteryPercent(masteryCounts({ a: 'learning' }))).toBe(40);
+  it('uses the modes a session asks for by default, the same as the tint on Home and Map', () => {
+    const derived = replay([intro('test.mid', T0), right('test.mid', T0 + 1000)], s);
+    expect(masteryFills(callouts, derived, s)).toEqual(masteryFills(callouts, derived, s, MODES));
   });
   it('builds the before and after fills of a session from the changes', () => {
     const now = { a: 'known', b: 'learning', c: 'new' } as const;
@@ -336,5 +321,144 @@ describe('headingOf', () => {
     expect(headingOf(360)).toBe('east');
     expect(headingOf(22)).toBe('east');
     expect(headingOf(23)).toBe('north-east');
+  });
+});
+
+describe('pageWindow', () => {
+  it('slices a list into pages of the size that fits', () => {
+    expect(pageWindow(10, 4, null)).toEqual({ page: 0, pageCount: 3, from: 0, to: 4 });
+    expect(pageWindow(10, 4, 2)).toEqual({ page: 2, pageCount: 3, from: 8, to: 10 });
+    expect(pageWindow(8, 4, 1)).toEqual({ page: 1, pageCount: 2, from: 4, to: 8 });
+  });
+  it('follows the anchor when no page was picked, and a picked page wins', () => {
+    expect(pageWindow(10, 4, null, 5)).toMatchObject({ page: 1, from: 4, to: 8 });
+    expect(pageWindow(10, 4, null, 9)).toMatchObject({ page: 2 });
+    expect(pageWindow(10, 4, 0, 9)).toMatchObject({ page: 0 });
+    expect(pageWindow(10, 4, null, -1)).toMatchObject({ page: 0 });
+  });
+  it('keeps a page that is out of range inside the list', () => {
+    expect(pageWindow(10, 4, 7)).toMatchObject({ page: 2 });
+    expect(pageWindow(10, 4, -3)).toMatchObject({ page: 0 });
+    // the list got shorter than the page the learner was on
+    expect(pageWindow(3, 4, 2)).toEqual({ page: 0, pageCount: 1, from: 0, to: 3 });
+  });
+  it('shows nothing while the room is unknown or there is nothing to show', () => {
+    expect(pageWindow(10, 0, null)).toEqual({ page: 0, pageCount: 1, from: 0, to: 0 });
+    expect(pageWindow(0, 5, null)).toEqual({ page: 0, pageCount: 1, from: 0, to: 0 });
+  });
+});
+
+describe('fitLists', () => {
+  // a row is 26 px, a heading 38 px
+  it('gives every row to everyone when there is room', () => {
+    expect(fitLists(1000, [3, 3, 3], 26, 38)).toEqual([3, 3, 3]);
+  });
+  it('never asks for more rows than a list has', () => {
+    expect(fitLists(1000, [1, 0, 2], 26, 38)).toEqual([1, 0, 2]);
+  });
+  it('deals rows out in turn, so no list runs to full length while another has none', () => {
+    // 3 headings (114) + 6 rows (156) = 270
+    expect(fitLists(270, [3, 3, 3], 26, 38)).toEqual([2, 2, 2]);
+    // one px short of the next row, and then exactly enough for it (it goes to the first list)
+    expect(fitLists(295, [3, 3, 3], 26, 38)).toEqual([2, 2, 2]);
+    expect(fitLists(296, [3, 3, 3], 26, 38)).toEqual([3, 2, 2]);
+  });
+  it('drops the lists at the end when there is not room for a heading and one row each', () => {
+    expect(fitLists(64, [3, 3, 3], 26, 38)).toEqual([1, 0, 0]);
+    expect(fitLists(128, [3, 3, 3], 26, 38)).toEqual([1, 1, 0]);
+  });
+  it('can show nothing, and never shows more than fits', () => {
+    expect(fitLists(10, [3, 3], 26, 38)).toEqual([0, 0]);
+    expect(fitLists(0, [3], 26, 38)).toEqual([0]);
+    expect(fitLists(500, [], 26, 38)).toEqual([]);
+    for (const room of [0, 40, 70, 100, 150, 200, 300]) {
+      const counts = fitLists(room, [3, 3, 3], 26, 38);
+      const used = counts.reduce((n, c) => n + (c > 0 ? 38 + 26 * c : 0), 0);
+      expect(used).toBeLessThanOrEqual(room);
+    }
+  });
+});
+
+describe('words for numbers', () => {
+  it('writes seconds with one decimal', () => {
+    expect(secondsText(2400)).toBe('2.4 s');
+    expect(secondsText(0)).toBe('0.0 s');
+    expect(secondsText(12_345)).toBe('12.3 s');
+  });
+  it('writes a day as the day of the month and a short month', () => {
+    expect(dayLabel(at(2026, 11, 2, 23))).toBe('2 nov');
+    expect(dayLabel(at(2026, 1, 31, 0, 1))).toBe('31 jan');
+  });
+});
+
+describe('heatLayout', () => {
+  // 26 columns with 25 gaps of 2 px and 26 px of weekday letters across; 7 rows with 7 gaps and 14 px of month names down
+  it('uses the biggest square that fits both ways', () => {
+    expect(heatLayout(900, 400)).toEqual({ cell: 22, gutter: 26 }); // room for 31 across and 50 down, capped at 22
+    expect(heatLayout(600, 400)).toEqual({ cell: 20, gutter: 26 }); // across: (600 - 26 - 50) / 26 = 20.1
+    expect(heatLayout(600, 120)).toEqual({ cell: 13, gutter: 26 }); // down: (120 - 14 - 14) / 7 = 13.1 is the smaller limit
+  });
+  it('drops the weekday letters before the squares get smaller than 10 px', () => {
+    expect(heatLayout(336, 300)).toEqual({ cell: 10, gutter: 26 }); // (336 - 26 - 50) / 26 = 10 exactly
+    expect(heatLayout(300, 300)).toEqual({ cell: 9, gutter: 0 }); // with letters it would be 8; without, (300 - 50) / 26 = 9.6
+  });
+  it('never goes below the smallest square, even in a box that cannot hold the grid', () => {
+    expect(heatLayout(10, 10)).toEqual({ cell: 4, gutter: 0 });
+  });
+  it('fits the box it was given whenever the squares are above the minimum', () => {
+    for (const [w, h] of [[560, 180], [336, 100], [290, 100], [900, 300], [400, 200], [250, 90]] as const) {
+      const { cell, gutter } = heatLayout(w, h);
+      if (cell > 4) {
+        expect(gutter + 26 * cell + 25 * 2).toBeLessThanOrEqual(w);
+        expect(14 + 7 * cell + 7 * 2).toBeLessThanOrEqual(h);
+      }
+    }
+  });
+  it('takes another number of weeks and other sizes', () => {
+    expect(heatLayout(100, 100, 4, { gap: 1, head: 0, gutter: 0, min: 2, max: 50 })).toEqual({ cell: 13, gutter: 0 }); // (100 - 3) / 4 = 24 across, (100 - 7) / 7 = 13 down
+  });
+});
+
+describe('sparkline', () => {
+  it('draws one line through weeks that have a value and a dot on each, newest marked', () => {
+    const line = sparkline([2000, 1500, 1000], 100, 50, 5);
+    expect(line.top).toBe(2300); // 2000 * 1.15
+    expect(line.paths).toHaveLength(1);
+    expect(line.dots.map((d) => d.index)).toEqual([0, 1, 2]);
+    expect(line.dots.map((d) => d.last)).toEqual([false, false, true]);
+    // first and last dots sit on the padding, higher values higher up (smaller y)
+    expect(line.dots[0]!.x).toBe(5);
+    expect(line.dots[2]!.x).toBe(95);
+    expect(line.dots[0]!.y).toBeLessThan(line.dots[2]!.y);
+  });
+  it('breaks the line at a week without a value and keeps a lone week as a dot only', () => {
+    const line = sparkline([1000, 1200, null, 900, null, 800], 120, 60);
+    expect(line.paths).toHaveLength(1); // 1000-1200; the lone 900 and 800 have no line to belong to
+    expect(line.dots.map((d) => d.index)).toEqual([0, 1, 3, 5]);
+    expect(line.dots.at(-1)!.last).toBe(true);
+  });
+  it('keeps every point inside the box', () => {
+    const line = sparkline([300, 9000, 4500, null, 100], 80, 40, 6);
+    for (const d of line.dots) {
+      expect(d.x).toBeGreaterThanOrEqual(6);
+      expect(d.x).toBeLessThanOrEqual(74);
+      expect(d.y).toBeGreaterThanOrEqual(6);
+      expect(d.y).toBeLessThanOrEqual(34);
+    }
+  });
+  it('has nothing to draw without values, and centres a single week', () => {
+    expect(sparkline([null, null, null], 100, 50)).toEqual({ paths: [], dots: [], top: 1 });
+    expect(sparkline([], 100, 50)).toEqual({ paths: [], dots: [], top: 1 });
+    const one = sparkline([1500], 100, 50);
+    expect(one.dots).toHaveLength(1);
+    expect(one.dots[0]!.x).toBe(50);
+    expect(one.paths).toEqual([]);
+  });
+});
+
+describe('weeksText', () => {
+  it('is singular for one', () => {
+    expect(weeksText(1)).toBe('1 week');
+    expect(weeksText(11)).toBe('11 weeks');
   });
 });

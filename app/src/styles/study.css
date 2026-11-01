@@ -28,7 +28,7 @@
 .st-views { display: none; }
 
 /* ---- left: zone, filters, list ---- */
-.st-nav { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr) auto; gap: var(--s2); min-height: 0; min-width: 0; }
+.st-nav { container: stnav / inline-size; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr) auto; gap: var(--s2); min-height: 0; min-width: 0; }
 .st-zone { display: grid; grid-template-columns: 36px minmax(0, 1fr) 36px; align-items: center; height: 36px; }
 .st-zname { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
 .st-zname b { font-weight: 600; }
@@ -41,6 +41,10 @@
 .st-filters { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--s2); }
 .st-sel { width: 100%; min-width: 0; height: 32px; padding: 0 var(--s2); border: 0; border-bottom: 2px solid var(--rule-strong); border-radius: 0; background: var(--surface); color: var(--text); font: inherit; font-size: var(--fs-sm); text-transform: inherit; }
 .st-sel:hover { background: var(--surface-hi); }
+/* "all states" needs about 95 px with its arrow; below two such selects side by side they stack, so a label is never cut */
+@container stnav (max-width: 215px) {
+  .st-filters { grid-template-columns: minmax(0, 1fr); gap: var(--s1); }
+}
 .st-sel:focus-visible { border-bottom-color: var(--main); }
 .st-sel option { background: var(--surface); color: var(--text); }
 
@@ -75,6 +79,7 @@
 .st-cap { min-height: 1.5em; }
 .st-keys { font-size: var(--fs-xs); color: var(--sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .st-keys kbd + kbd { margin-left: 4px; }
+.st-keys kbd.to { margin-left: 0; }
 
 /* ---- right: where it is, and what it is ---- */
 .st-where { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; gap: var(--s4); min-height: 0; min-width: 0; }
@@ -92,7 +97,8 @@
 .st-state { color: var(--text); }
 .st-blurb { font-size: var(--fs-md); }
 .st-game { font-size: var(--fs-sm); }
-.st-game b { color: var(--text); font-weight: 500; }
+.st-game b, .st-alias b { color: var(--text); font-weight: 500; }
+.st-alias { font-size: var(--fs-sm); display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .st-nbs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .st-nb { color: var(--text); cursor: pointer; transition: background-color var(--t-fast) ease; }
 .st-nb:hover { background: var(--surface-hi); }
@@ -136,7 +142,7 @@
   .st-pager { min-height: 22px; }
   .st-photo { gap: var(--s1); }
   .st-thumbs { height: 34px; }
-  .st-cap, .st-keys, .st-game, .st-nbs { display: none; }
+  .st-cap, .st-keys, .st-game, .st-alias, .st-nbs { display: none; }
   .st-where { gap: var(--s2); }
   .st-about { gap: var(--s1); }
   .st-name { font-size: clamp(13px, calc(100cqw / (var(--n, 9) * 0.6 + 0.4)), 18px); }
