@@ -10,6 +10,7 @@
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "check:budget": "node scripts/check-budget.mjs",
     "check:runes": "node scripts/check-runes.mjs",
+    "check:licences": "node scripts/licences.mjs --check",
     "test": "vitest run",
     "test:watch": "vitest",
     "e2e": "playwright test",
